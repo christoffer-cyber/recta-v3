@@ -1,0 +1,79 @@
+# Recta - AI Organizational Intelligence
+
+## Tech Stack
+- Next.js 15 App Router
+- TypeScript strict mode
+- Tailwind CSS (no custom CSS files)
+- Framer Motion for animations
+- Claude API (Anthropic SDK)
+- react-markdown + remark-gfm
+
+## Code Style
+- Functional components only
+- 'use client' explicitly when needed
+- Server components by default
+- Descriptive variable names
+- Async/await over promises.then()
+
+## Architecture
+- Types: lib/types.ts
+- Phases: lib/phases.ts
+- API: app/api/[endpoint]/route.ts
+- Components: components/[ComponentName].tsx
+- Utils: lib/[util-name].ts
+
+## UI/UX Rules
+- 30/70 chat-canvas split (chat left, canvas right)
+- Dark sidebar background: bg-gray-900 (#111827)
+- Light canvas: bg-white
+- User messages: structured cards with border, NOT bubbles
+- AI messages: markdown formatted, full-width
+- Smooth animations: 200-300ms duration
+- No scrolling in chat (show max 6 messages)
+- Phase stepper in top bar
+- Fullscreen layout (h-screen w-screen)
+
+## Message Formatting
+- User messages: 
+  - Label "DU" above message
+  - bg-gray-800 with border-gray-700
+  - Full width, structured card
+- AI messages:
+  - Label "AI COACH" above message
+  - Render with ReactMarkdown + remarkGfm
+  - prose prose-invert prose-sm classes
+  - Support ## headers, **bold**, bullet lists
+
+## Component Patterns
+- Always export as named export
+- Props interface above component
+- Use TypeScript for all props
+- Framer Motion for animations (motion.div)
+
+## API Routes
+- Use NextRequest and NextResponse
+- Always try/catch with error logging
+- Return JSON with proper status codes
+- System prompts in constants
+
+## Git Workflow
+- Commit after each working feature
+- Format: "Add [feature]" or "Fix [bug]" or "Update [thing]"
+- Push to main after local testing
+
+## Language
+- All UI text in Swedish
+- AI responses in Swedish (via system prompt)
+- Code comments in English
+- Variable names in English
+
+## Performance
+- Server components by default
+- Client components only for interactivity
+- Lazy load heavy components
+- Optimize images with next/image
+
+## Error Handling
+- Always show user-friendly error messages in Swedish
+- Log detailed errors to console
+- Never expose API keys or internal errors to users
