@@ -10,9 +10,19 @@ interface ChatSidebarProps {
   messages: Message[];
   onSendMessage: (content: string) => void;
   isLoading?: boolean;
+  phaseComplete?: boolean;
+  onAdvancePhase?: () => void;
+  nextPhaseName?: string;
 }
 
-export function ChatSidebar({ messages, onSendMessage, isLoading }: ChatSidebarProps) {
+export function ChatSidebar({ 
+  messages, 
+  onSendMessage, 
+  isLoading,
+  phaseComplete = false,
+  onAdvancePhase,
+  nextPhaseName = 'nästa fas'
+}: ChatSidebarProps) {
   const [input, setInput] = useState('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -54,10 +64,14 @@ export function ChatSidebar({ messages, onSendMessage, isLoading }: ChatSidebarP
           {visibleMessages.map((message, index) => (
             <motion.div
               key={index}
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
+              initial={{ opacity: 0, x: message.role === 'user' ? 10 : -10 }}
+              animate={{ opacity: 1, x: 0 }}
               exit={{ opacity: 0, y: -10 }}
-              transition={{ duration: 0.2 }}
+              transition={{ 
+                type: 'spring',
+                stiffness: 400,
+                damping: 30
+              }}
             >
               {message.role === 'user' ? (
                 // User message: Structured card (NOT bubble)
@@ -71,7 +85,7 @@ export function ChatSidebar({ messages, onSendMessage, isLoading }: ChatSidebarP
                 // AI message: Full-width markdown
                 <div className="w-full">
                   <div className="text-xs text-gray-400 mb-1.5 font-medium">AI COACH</div>
-                  <div className="prose prose-invert prose-sm max-w-none">
+                  <div className="prose prose-invert prose-sm max-w-none text-gray-100 [&>*]:text-gray-100 [&>p]:text-gray-100 [&>ul]:text-gray-100 [&>ol]:text-gray-100 [&>li]:text-gray-100 [&>h1]:text-gray-100 [&>h2]:text-gray-100 [&>h3]:text-gray-100 [&>strong]:text-gray-100 [&>em]:text-gray-100">
                     <ReactMarkdown remarkPlugins={[remarkGfm]}>
                       {message.content}
                     </ReactMarkdown>
@@ -101,6 +115,25 @@ export function ChatSidebar({ messages, onSendMessage, isLoading }: ChatSidebarP
         <div ref={messagesEndRef} />
       </div>
 
+      {/* Phase Complete Button */}
+      {phaseComplete && onAdvancePhase && (
+        <motion.div
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="px-4 pb-3"
+        >
+          <button
+            onClick={onAdvancePhase}
+            className="w-full bg-green-600 hover:bg-green-700 text-white px-4 py-3 rounded-lg font-medium transition-colors flex items-center justify-center gap-2"
+          >
+            <span>Fortsätt till {nextPhaseName}</span>
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
+            </svg>
+          </button>
+        </motion.div>
+      )}
+
       {/* Input */}
       <div className="p-4 border-t border-gray-800">
         <div className="flex gap-2">
@@ -110,12 +143,12 @@ export function ChatSidebar({ messages, onSendMessage, isLoading }: ChatSidebarP
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={handleKeyDown}
             placeholder="Skriv ditt meddelande..."
-            disabled={isLoading}
+            disabled={isLoading || phaseComplete}
             className="flex-1 bg-gray-800 text-white placeholder-gray-500 px-4 py-2 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-600 disabled:opacity-50"
           />
           <button
             onClick={handleSend}
-            disabled={!input.trim() || isLoading}
+            disabled={!input.trim() || isLoading || phaseComplete}
             className="bg-blue-600 hover:bg-blue-700 disabled:bg-gray-700 disabled:cursor-not-allowed text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors"
           >
             Skicka
