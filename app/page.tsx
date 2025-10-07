@@ -38,26 +38,32 @@ export default function Home() {
   const handleAdvancePhase = () => {
     if (!phaseConfig?.nextPhase) return;
 
-    // Clear messages and start new phase
+    // Get next phase config
     const nextConfig = getPhaseConfig(phaseConfig.nextPhase);
-    if (nextConfig) {
-      setMessages([
-        {
-          role: 'assistant',
-          content: nextConfig.welcomeMessage,
-          timestamp: new Date().toISOString()
-        }
-      ]);
+    if (!nextConfig) return;
 
-      setCanvasData({
-        phaseViz: {
-          currentPhase: `${nextConfig.name} - ${nextConfig.id === 'problem-discovery' ? 'Identifierar utmaningar' : nextConfig.id === 'solution-design' ? 'Utforskar lösningar' : 'Skapar action plan'}`,
-          completedPhases: [...(canvasData.phaseViz?.completedPhases || []), phaseConfig.name],
-          insights: [],
-          confidence: 0
-        }
-      });
-    }
+    // KEEP existing messages and ADD welcome message
+    const welcomeMessage: Message = {
+      role: 'assistant',
+      content: nextConfig.welcomeMessage,
+      timestamp: new Date().toISOString()
+    };
+
+    setMessages(prev => [...prev, welcomeMessage]);  // ← APPEND, don't replace!
+
+    // Update canvas to show new phase
+    setCanvasData({
+      phaseViz: {
+        currentPhase: `${nextConfig.name} - ${
+          nextConfig.id === 'problem-discovery' ? 'Identifierar utmaningar' : 
+          nextConfig.id === 'solution-design' ? 'Utforskar lösningar' : 
+          'Skapar action plan'
+        }`,
+        completedPhases: [...(canvasData.phaseViz?.completedPhases || []), phaseConfig.name],
+        insights: canvasData.phaseViz?.insights || [],  // ← KEEP insights too!
+        confidence: 0  // Reset confidence for new phase
+      }
+    });
   };
 
   const handleSendMessage = async (content: string) => {
@@ -68,16 +74,6 @@ export default function Home() {
     };
     setMessages(prev => [...prev, userMessage]);
     setIsLoading(true);
-
-    const newConfidence = Math.min(100, (canvasData.phaseViz?.confidence || 0) + 15);
-    setCanvasData(prev => ({
-      ...prev,
-      phaseViz: {
-        ...prev.phaseViz!,
-        insights: [...(prev.phaseViz?.insights || []), content.substring(0, 60)],
-        confidence: newConfidence
-      }
-    }));
 
     try {
       const response = await fetch('/api/chat', {
@@ -94,6 +90,20 @@ export default function Home() {
         timestamp: new Date().toISOString()
       };
       setMessages(prev => [...prev, aiMessage]);
+
+      // Update canvas with extracted insights and confidence
+      const newConfidence = Math.min(100, (canvasData.phaseViz?.confidence || 0) + 15);
+      setCanvasData(prev => ({
+        ...prev,
+        phaseViz: {
+          ...prev.phaseViz!,
+          insights: data.insights 
+            ? [...(prev.phaseViz?.insights || []), ...data.insights]  // ← Use Claude's insights!
+            : prev.phaseViz?.insights || [],
+          confidence: newConfidence
+        }
+      }));
+      
     } catch (error) {
       console.error('Error:', error);
       const errorMessage: Message = {
@@ -120,6 +130,7 @@ export default function Home() {
         />
       }
       canvas={<Canvas state={canvasState} data={canvasData} />}
+      currentPhase={currentPhase}
     />
   );
 }

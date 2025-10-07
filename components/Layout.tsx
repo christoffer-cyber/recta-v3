@@ -5,9 +5,10 @@ import { ReactNode } from 'react';
 interface LayoutProps {
   chat: ReactNode;
   canvas: ReactNode;
+  currentPhase: string;
 }
 
-export function Layout({ chat, canvas }: LayoutProps) {
+export function Layout({ chat, canvas, currentPhase }: LayoutProps) {
   return (
     <div className="h-screen w-screen overflow-hidden bg-gray-50 flex flex-col">
       {/* Top Bar */}
@@ -22,13 +23,29 @@ export function Layout({ chat, canvas }: LayoutProps) {
 
         {/* Phase Indicator */}
         <div className="flex items-center gap-3">
-          <PhaseStep label="Context" icon="🏢" active />
+          <PhaseStep 
+            label="Context" 
+            icon="🏢" 
+            active={currentPhase.includes('Context')} 
+          />
           <div className="w-6 h-px bg-gray-700" />
-          <PhaseStep label="Discovery" icon="🔍" />
+          <PhaseStep 
+            label="Discovery" 
+            icon="🔍" 
+            active={currentPhase.includes('Discovery')} 
+          />
           <div className="w-6 h-px bg-gray-700" />
-          <PhaseStep label="Solution" icon="💡" />
+          <PhaseStep 
+            label="Solution" 
+            icon="💡" 
+            active={currentPhase.includes('Solution')} 
+          />
           <div className="w-6 h-px bg-gray-700" />
-          <PhaseStep label="Action" icon="📋" />
+          <PhaseStep 
+            label="Action" 
+            icon="📋" 
+            active={currentPhase.includes('Action')} 
+          />
         </div>
 
         <button className="text-gray-400 hover:text-white">
