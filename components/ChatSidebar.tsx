@@ -142,9 +142,13 @@ export function ChatSidebar({
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder="Skriv ditt meddelande..."
+            placeholder={
+              phaseComplete 
+                ? "Fas klar - klicka 'Fortsätt' ovan ⬆️" 
+                : "Skriv ditt meddelande..."
+            }
             disabled={isLoading || phaseComplete}
-            className="flex-1 bg-gray-800 text-white placeholder-gray-500 px-4 py-2 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-600 disabled:opacity-50"
+            className="flex-1 bg-gray-800 text-white placeholder-gray-500 px-4 py-2 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-600 disabled:opacity-50 disabled:cursor-not-allowed"
           />
           <button
             onClick={handleSend}
