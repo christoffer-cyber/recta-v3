@@ -4,7 +4,8 @@ export type CanvasState =
   | 'jd-preview'
   | 'research'
   | 'scenarios'
-  | 'benchmarks';
+  | 'benchmarks'
+  | 'deliverables';
 
 export interface JobDescriptionPreview {
   title: string;

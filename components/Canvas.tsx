@@ -3,7 +3,9 @@
 import { motion, AnimatePresence } from 'framer-motion';
 import { PhaseVisualization } from './canvas/PhaseVisualization';
 import { JDPreview } from './canvas/JDPreview';
+import { DeliverablesView } from './DeliverablesView';
 import type { CanvasState, JobDescriptionPreview, PhaseVisualization as PhaseViz } from '@/lib/canvas-types';
+import type { JobDescription, CompensationAnalysis, InterviewQuestions, SuccessPlan } from '@/lib/deliverable-schemas';
 
 interface CanvasProps {
   state: CanvasState;
@@ -11,9 +13,15 @@ interface CanvasProps {
     jdPreview?: JobDescriptionPreview;
     phaseViz?: PhaseViz;
   };
+  deliverables?: {
+    jobDescription?: JobDescription;
+    compensation?: CompensationAnalysis;
+    interviewQuestions?: InterviewQuestions;
+    successPlan?: SuccessPlan;
+  };
 }
 
-export function Canvas({ state, data }: CanvasProps) {
+export function Canvas({ state, data, deliverables }: CanvasProps) {
   return (
     <div className="h-full p-8 overflow-auto">
       <AnimatePresence mode="wait">
@@ -66,6 +74,19 @@ export function Canvas({ state, data }: CanvasProps) {
             transition={{ type: 'spring', stiffness: 300, damping: 30 }}
           >
             <JDPreview data={data.jdPreview} />
+          </motion.div>
+        )}
+
+        {state === 'deliverables' && deliverables && (
+          <motion.div
+            key="deliverables"
+            initial={{ opacity: 0, x: 20 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: -20 }}
+            transition={{ type: 'spring', stiffness: 300, damping: 30 }}
+            className="h-full"
+          >
+            <DeliverablesView {...deliverables} />
           </motion.div>
         )}
       </AnimatePresence>
