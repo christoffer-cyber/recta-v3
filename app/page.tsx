@@ -4,7 +4,7 @@ import { useState, useRef, useEffect } from 'react';
 import { Layout } from '@/components/Layout';
 import { ChatSidebar } from '@/components/ChatSidebar';
 import { Canvas } from '@/components/Canvas';
-import { Message } from '@/lib/types';
+import { Message, Scenario } from '@/lib/types';
 import { getPhaseConfig } from '@/lib/phase-config';
 import { deduplicateInsights } from '@/lib/insight-utils';
 import type { CanvasState, PhaseVisualization } from '@/lib/canvas-types';
@@ -57,6 +57,7 @@ export default function Home() {
   ]);
   const [isLoading, setIsLoading] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
+  const [isGeneratingScenarios, setIsGeneratingScenarios] = useState(false);
   
   // Canvas state
   const [canvasState, setCanvasState] = useState<CanvasState>('phase-progress');
@@ -126,7 +127,7 @@ export default function Home() {
     return phaseMap[phaseName] || 'Context';
   };
 
-  const handleAdvancePhase = () => {
+  const handleAdvancePhase = async () => {  // ← Make it async
     if (!phaseConfig?.nextPhase) return;
 
     // Get next phase config
@@ -152,10 +153,89 @@ export default function Home() {
         }`,
         completedPhases: [...(canvasData.phaseViz?.completedPhases || []), phaseConfig.name],
         insights: [],  // ← Clear insights for fresh start
-        confidence: 0  // Reset confidence for new phase
+        confidence: 0,  // Reset confidence for new phase
+        scenarios: undefined  // ← Clear old scenarios
       },
       isNewPhase: true // Mark as new phase
     });
+
+    // AUTO-GENERATE SCENARIOS FOR SOLUTION DESIGN
+    if (nextConfig.id === 'solution-design') {
+      await generateScenariosAutomatically();
+    }
+  };
+
+  // ADD THIS NEW FUNCTION after handleAdvancePhase
+  const generateScenariosAutomatically = async () => {
+    setIsGeneratingScenarios(true);
+    
+    try {
+      // CRITICAL: Collect insights from BOTH Context and Problem Discovery phases
+      // We need complete picture: company info + problem details
+      
+      // Get ALL messages from Context and Problem Discovery
+      const allPhaseMessages = messages.filter(m => 
+        m.role === 'assistant' || m.role === 'user'
+      );
+      
+      // Get completed phases' insights from completedPhases array
+      // (Context and Problem Discovery should both be complete by now)
+      // This will be empty since we clear insights on transition
+      // But we keep ALL messages which contain the info
+
+      const response = await fetch('/api/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          messages: allPhaseMessages,  // ← ALL messages (Context + Problem Discovery)
+          existingInsights: [],  // Not used for scenario gen
+          currentConfidence: 0,
+          currentPhase: 'Solution Design',
+          isNewPhase: true,
+          generateScenarios: true  // ← Special flag
+        })
+      });
+
+      const data = await response.json();
+      
+      if (data.scenarios) {
+        // Add scenarios to canvas
+        setCanvasData(prev => ({
+          ...prev,
+          phaseViz: {
+            ...prev.phaseViz!,
+            scenarios: data.scenarios
+          }
+        }));
+
+        // Add AI follow-up message
+        const followUpMessage: Message = {
+          role: 'assistant',
+          content: `Jag har analyserat er situation och tagit fram 3 möjliga lösningsvägar. Du kan se dem i Canvas till höger.
+
+${data.scenarios.map((s: Scenario, i: number) => `**${i + 1}. ${s.name}** - ${s.description}`).join('\n\n')}
+
+Vilken av dessa scenarios känns mest rätt för er situation?`,
+          timestamp: new Date().toISOString()
+        };
+        
+        setMessages(prev => [...prev, followUpMessage]);
+      }
+
+    } catch (error) {
+      console.error('Error generating scenarios:', error);
+      
+      // Fallback: Ask user to describe scenarios themselves
+      const fallbackMessage: Message = {
+        role: 'assistant',
+        content: 'Baserat på problemet ni beskrivit - vilka olika lösningsvägar kan ni tänka er? (T.ex. anställa senior, anställa två juniors, ta in konsult, etc.)',
+        timestamp: new Date().toISOString()
+      };
+      
+      setMessages(prev => [...prev, fallbackMessage]);
+    } finally {
+      setIsGeneratingScenarios(false);
+    }
   };
 
   const handleSendMessage = async (content: string) => {
