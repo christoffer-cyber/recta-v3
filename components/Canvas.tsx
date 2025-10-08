@@ -1,11 +1,14 @@
 'use client';
 
 import { motion, AnimatePresence } from 'framer-motion';
-import { PhaseVisualization } from './canvas/PhaseVisualization';
 import { JDPreview } from './canvas/JDPreview';
 import { DeliverablesView } from './DeliverablesView';
+import { ConfidenceBreakdown } from './canvas/ConfidenceBreakdown';
+import { ResearchAnimation } from './canvas/ResearchAnimation';
+import { InsightsFeed } from './canvas/InsightsFeed';
 import type { CanvasState, JobDescriptionPreview, PhaseVisualization as PhaseViz } from '@/lib/canvas-types';
 import type { JobDescription, CompensationAnalysis, InterviewQuestions, SuccessPlan } from '@/lib/deliverable-schemas';
+import { PHASE_REQUIREMENTS } from '@/lib/confidence/config';
 
 interface CanvasProps {
   state: CanvasState;
@@ -19,11 +22,22 @@ interface CanvasProps {
     interviewQuestions?: InterviewQuestions;
     successPlan?: SuccessPlan;
   };
+  researchState?: {
+    isActive: boolean;
+    progress: number;
+    queries: Array<{
+      text: string;
+      status: 'pending' | 'active' | 'complete';
+      duration?: number;
+    }>;
+    totalSources?: number;
+    totalInsights?: number;
+  };
 }
 
-export function Canvas({ state, data, deliverables }: CanvasProps) {
+export function Canvas({ state, data, deliverables, researchState }: CanvasProps) {
   return (
-    <div className="h-full p-8 overflow-auto">
+    <div className="h-full bg-gray-50">
       <AnimatePresence mode="wait">
         {state === 'empty' && (
           <motion.div
@@ -53,17 +67,72 @@ export function Canvas({ state, data, deliverables }: CanvasProps) {
           </motion.div>
         )}
 
-        {state === 'phase-progress' && data?.phaseViz && (
-          <motion.div
-            key="phase"
-            initial={{ opacity: 0, x: 20 }}
-            animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: -20 }}
-            transition={{ type: 'spring', stiffness: 300, damping: 30 }}
-          >
-            <PhaseVisualization data={data.phaseViz} />
-          </motion.div>
-        )}
+        {state === 'phase-progress' && data?.phaseViz && (() => {
+          const phaseId = data.phaseViz.currentPhase.split(' - ')[0].trim();
+          const requirements = PHASE_REQUIREMENTS[phaseId];
+
+          const formattedInsights = (data.phaseViz.insights || []).map((insight, index) => {
+            const [category, ...textParts] = insight.split(':');
+            return {
+              category: category.trim(),
+              text: textParts.join(':').trim(),
+              timestamp: new Date(Date.now() - (data.phaseViz!.insights.length - index) * 60000).toISOString(),
+              isNew: index === data.phaseViz!.insights.length - 1
+            };
+          });
+
+          return (
+            <div className="h-full overflow-y-auto p-8">
+              <motion.div
+                key="phase"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.3 }}
+                className="max-w-4xl mx-auto space-y-6"
+              >
+              {/* Title */}
+              <div>
+                <h2 className="text-2xl font-bold text-gray-900 mb-2">
+                  {data.phaseViz.currentPhase.split(' - ')[1] || 'Analyserar er situation'}
+                </h2>
+                <p className="text-gray-600">
+                  Samlar information för att ge bästa möjliga rekommendation
+                </p>
+              </div>
+
+              {/* Confidence Breakdown */}
+              {requirements && (
+                <ConfidenceBreakdown
+                  phase={phaseId}
+                  confidence={data.phaseViz.confidence}
+                  insights={data.phaseViz.insights}
+                  missingCategories={[]}
+                  requiredCategories={requirements.requiredCategories}
+                  optionalCategories={requirements.optionalCategories}
+                />
+              )}
+
+              {/* Research Animation (conditional) */}
+              {researchState && (
+                <ResearchAnimation
+                  isActive={researchState.isActive}
+                  progress={researchState.progress}
+                  queries={researchState.queries}
+                  totalSources={researchState.totalSources}
+                  totalInsights={researchState.totalInsights}
+                />
+              )}
+
+              {/* Insights Feed */}
+              <InsightsFeed 
+                insights={formattedInsights}
+                maxVisible={5}
+              />
+              </motion.div>
+            </div>
+          );
+        })()}
 
         {state === 'jd-preview' && data?.jdPreview && (
           <motion.div

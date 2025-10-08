@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { Layout } from '@/components/Layout';
 import { ChatSidebar } from '@/components/ChatSidebar';
 import { Canvas } from '@/components/Canvas';
@@ -62,13 +62,15 @@ export default function Home() {
   const [canvasState, setCanvasState] = useState<CanvasState>('phase-progress');
   const [canvasData, setCanvasData] = useState<{
     phaseViz?: PhaseVisualization;
+    isNewPhase?: boolean;
   }>({
     phaseViz: {
       currentPhase: 'Context - Förstår er situation',
       completedPhases: [],
       insights: [],
       confidence: 0
-    }
+    },
+    isNewPhase: true // First load is new phase
   });
 
   const [deliverables, setDeliverables] = useState<{
@@ -77,6 +79,32 @@ export default function Home() {
     interviewQuestions?: InterviewQuestions;
     successPlan?: SuccessPlan;
   }>({});
+
+  // Scroll preservation ref
+  const chatContainerRef = useRef<HTMLDivElement>(null);
+  const previousHeightRef = useRef<number>(0);
+
+  // Preserve scroll position when canvas updates
+  useEffect(() => {
+    const container = chatContainerRef.current;
+    if (!container) return;
+
+    const currentHeight = container.scrollHeight;
+    const heightDiff = currentHeight - previousHeightRef.current;
+
+    // If content added and user was scrolled up, maintain position
+    if (heightDiff > 0 && container.scrollTop > 0) {
+      const wasNearBottom = 
+        container.scrollHeight - container.scrollTop - container.clientHeight < 100;
+      
+      if (!wasNearBottom) {
+        // User was reading up, preserve position
+        container.scrollTop += heightDiff;
+      }
+    }
+
+    previousHeightRef.current = currentHeight;
+  }, [canvasData]);
 
   const currentPhase = canvasData.phaseViz?.currentPhase || 'Context';
   const phaseComplete = (canvasData.phaseViz?.confidence || 0) >= 100;
@@ -125,7 +153,8 @@ export default function Home() {
         completedPhases: [...(canvasData.phaseViz?.completedPhases || []), phaseConfig.name],
         insights: canvasData.phaseViz?.insights || [],  // ← KEEP insights too!
         confidence: 0  // Reset confidence for new phase
-      }
+      },
+      isNewPhase: true // Mark as new phase
     });
   };
 
@@ -146,7 +175,8 @@ export default function Home() {
           messages: [...messages, userMessage],
           existingInsights: canvasData.phaseViz?.insights || [],
           currentConfidence: canvasData.phaseViz?.confidence || 0,
-          currentPhase: getCurrentPhaseId()
+          currentPhase: getCurrentPhaseId(),
+          isNewPhase: canvasData.isNewPhase || false
         })
       });
 
@@ -168,15 +198,16 @@ export default function Home() {
       const oldConfidence = canvasData.phaseViz?.confidence || 0;
       const newConfidence = data.confidence ?? oldConfidence;
       
-      // Update canvas state
-      setCanvasData(prev => ({
-        ...prev,
-        phaseViz: {
-          ...prev.phaseViz!,
-          insights: deduplicatedInsights,
-          confidence: newConfidence
-        }
-      }));
+          // Update canvas state
+          setCanvasData(prev => ({
+            ...prev,
+            phaseViz: {
+              ...prev.phaseViz!,
+              insights: deduplicatedInsights,
+              confidence: newConfidence
+            },
+            isNewPhase: false // Clear after first message
+          }));
       
       // Check if we just crossed 100% threshold
       const justReached100 = newConfidence >= 100 && oldConfidence < 100;
@@ -282,6 +313,7 @@ export default function Home() {
     <Layout
       chat={
         <ChatSidebar
+          ref={chatContainerRef}
           messages={messages}
           onSendMessage={handleSendMessage}
           isLoading={isLoading}
@@ -293,7 +325,7 @@ export default function Home() {
           isActionPlan={isActionPlan}
         />
       }
-      canvas={<Canvas state={canvasState} data={canvasData} deliverables={deliverables} />}
+      canvas={<Canvas state={canvasState} data={canvasData} deliverables={deliverables} researchState={undefined} />}
       currentPhase={currentPhase}
     />
   );

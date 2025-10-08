@@ -56,16 +56,18 @@ export function Layout({ chat, canvas, currentPhase }: LayoutProps) {
         </button>
       </header>
 
-      {/* Main Content */}
+      {/* Main Content - FIXED HEIGHT */}
       <div className="flex-1 flex overflow-hidden">
         {/* Chat Sidebar - 30% */}
-        <aside className="w-[30%] bg-gray-900 border-r border-gray-800 flex flex-col">
+        <aside className="w-[30%] bg-gray-900 border-r border-gray-800 flex flex-col overflow-hidden">
           {chat}
         </aside>
 
-        {/* Canvas - 70% */}
-        <main className="flex-1 bg-white overflow-auto">
-          {canvas}
+        {/* Canvas - 70% with FIXED HEIGHT and INTERNAL SCROLL */}
+        <main className="flex-1 bg-white flex flex-col overflow-hidden">
+          <div className="flex-1 overflow-y-auto">
+            {canvas}
+          </div>
         </main>
       </div>
     </div>

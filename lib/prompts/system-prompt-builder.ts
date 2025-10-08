@@ -5,6 +5,7 @@ export interface SystemPromptOptions {
   insights: string[];
   confidence: number;
   researchContext?: string;
+  isNewPhase?: boolean;
 }
 
 export function buildSystemPrompt(options: SystemPromptOptions): string {
@@ -16,7 +17,7 @@ export function buildSystemPrompt(options: SystemPromptOptions): string {
   }
 
   const basePrompt = buildBasePrompt(config);
-  const contextSection = buildContextSection(options.insights, options.confidence, config);
+  const contextSection = buildContextSection(options.insights, options.confidence, config, options.isNewPhase);
   const researchSection = options.researchContext || '';
   const behaviorGuidelines = buildBehaviorGuidelines();
   const insightExtraction = buildInsightExtraction(config);
@@ -48,8 +49,32 @@ ${config.transitionCriteria}`;
 function buildContextSection(
   insights: string[], 
   confidence: number,
-  config: PhasePromptConfig
+  config: PhasePromptConfig,
+  isNewPhase?: boolean
 ): string {
+  // CRITICAL: If brand new phase with 0 confidence, start completely fresh
+  if (isNewPhase && confidence < 15) {
+    return `## 🚨 VIKTIGT: DETTA ÄR EN NY FAS 🚨
+
+Du har precis börjat fasen: ${config.role.split('Du är')[1] || 'denna fas'}
+
+**IGNORERA all tidigare konversation om andra faser.**
+
+Din ENDA uppgift nu är att samla information om:
+
+REQUIRED (MÅSTE ha):
+${config.insightCategories.required.map(c => `- ${c}`).join('\n')}
+
+OPTIONAL (Bonus):
+${config.insightCategories.optional.map(c => `- ${c}`).join('\n')}
+
+**Confidence är ${confidence}% - du har INTE nog information än.**
+
+**SÄG INTE "vi är klara" eller "redo att gå vidare".**
+**BÖRJA ställa frågor relevanta för DENNA fas.**`;
+  }
+
+  // If no insights yet
   if (insights.length === 0) {
     return `## NUVARANDE KONTEXT:
 Inga insights samlade än (${confidence}% confidence).
@@ -61,9 +86,35 @@ Valfria kategorier (bonus):
 ${config.insightCategories.optional.map(c => `- ${c}`).join('\n')}`;
   }
 
-  // Group insights by category
-  const grouped = groupInsightsByCategory(insights);
-  const deduplicatedInsights = Array.from(new Set(insights));
+  // Filter insights - ONLY show phase-relevant ones
+  const relevantCategories = [
+    ...config.insightCategories.required,
+    ...config.insightCategories.optional
+  ];
+  
+  const relevantInsights = insights.filter(insight => {
+    const category = insight.split(':')[0].trim();
+    return relevantCategories.some(reqCat => 
+      category.toLowerCase().includes(reqCat.toLowerCase()) ||
+      reqCat.toLowerCase().includes(category.toLowerCase())
+    );
+  });
+
+  // If NO relevant insights for THIS phase, treat as fresh start
+  if (relevantInsights.length === 0 && confidence < 30) {
+    return `## NUVARANDE KONTEXT:
+
+Vi har information från tidigare fas, men för DENNA fas (${confidence}% confidence) behöver vi samla:
+
+REQUIRED:
+${config.insightCategories.required.map(c => `- ${c}`).join('\n')}
+
+**Börja ställ frågor relevanta för dessa kategorier.**`;
+  }
+
+  // Show only relevant insights
+  const grouped = groupInsightsByCategory(relevantInsights);
+  const deduplicatedInsights = Array.from(new Set(relevantInsights));
 
   // Check coverage
   const missingRequired = config.insightCategories.required.filter(
@@ -75,18 +126,26 @@ ${config.insightCategories.optional.map(c => `- ${c}`).join('\n')}`;
     coverageStatus = `
 
 **SAKNAS REQUIRED KATEGORIER (fokusera här):**
-${missingRequired.map(c => `- ${c}`).join('\n')}`;
+${missingRequired.map(c => `- ${c} ← FRÅGA OM DETTA!`).join('\n')}
+
+**Du har INTE tillräckligt för att gå vidare än.**`;
+  } else if (confidence < 90) {
+    coverageStatus = `
+
+✓ Required kategorier täckta, men confidence endast ${confidence}%.
+**Fortsätt samla mer detaljer innan du säger "klart".**`;
   } else {
-    coverageStatus = '\n\n✓ Alla required kategorier täckta!';
+    coverageStatus = '\n\n✓ Alla required kategorier täckta med hög confidence!';
   }
 
   return `## NUVARANDE KONTEXT:
-Vi har samlat ${insights.length} insights (${confidence}% confidence):
+Vi har samlat ${relevantInsights.length} relevanta insights för denna fas (${confidence}% confidence):
 
-${deduplicatedInsights.map((insight, i) => `${i + 1}. ${insight}`).join('\n')}
+${deduplicatedInsights.slice(0, 8).map((insight, i) => `${i + 1}. ${insight}`).join('\n')}
+${deduplicatedInsights.length > 8 ? `... och ${deduplicatedInsights.length - 8} till` : ''}
 ${coverageStatus}
 
-**Bygg på dessa insights - fråga inte om information vi redan har.**`;
+**Bygg på dessa insights - fortsätt ställa frågor tills confidence når 90%+.**`;
 }
 
 function groupInsightsByCategory(insights: string[]): Record<string, string[]> {
@@ -111,6 +170,12 @@ function buildBehaviorGuidelines(): string {
 - Utmana antaganden artigt när det behövs
 - Var koncis - undvik långa förklaringar om inte ombedd
 - Naturlig svenska (du kan mixa in engelska termer när lämpligt)
+
+## 🚨 KRITISKT - FAS-REGLER:
+- SÄG ALDRIG "vi är klara" eller "redo att gå vidare" förrän confidence är 90%+
+- SÄG ALDRIG "perfekt, låt oss gå vidare" om du inte samlat ALL required information
+- Om confidence < 90%: FORTSÄTT STÄLLA FRÅGOR
+- Varje fas måste genomföras ordentligt - INGEN genväg
 
 ## RESEARCH-ANVÄNDNING (om tillgänglig):
 När research-kontext finns:

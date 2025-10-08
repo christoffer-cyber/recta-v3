@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, forwardRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -18,19 +18,26 @@ interface ChatSidebarProps {
   isActionPlan?: boolean;
 }
 
-export function ChatSidebar({ 
-  messages, 
-  onSendMessage, 
-  isLoading,
-  phaseComplete = false,
-  onAdvancePhase,
-  nextPhaseName = 'nästa fas',
-  onGenerateDeliverables,
-  isGenerating = false,
-  isActionPlan = false
-}: ChatSidebarProps) {
+export const ChatSidebar = forwardRef<HTMLDivElement, ChatSidebarProps>(function ChatSidebar(
+  { 
+    messages, 
+    onSendMessage, 
+    isLoading,
+    phaseComplete = false,
+    onAdvancePhase,
+    nextPhaseName = 'nästa fas',
+    onGenerateDeliverables,
+    isGenerating = false,
+    isActionPlan = false
+  },
+  scrollContainerRef
+) {
   const [input, setInput] = useState('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const internalScrollRef = useRef<HTMLDivElement>(null);
+  
+  // Use external ref if provided, otherwise use internal
+  const scrollRef = scrollContainerRef || internalScrollRef;
 
   // Auto-scroll to bottom
   useEffect(() => {
@@ -65,7 +72,7 @@ export function ChatSidebar({
       </div>
 
       {/* Messages */}
-      <div className="flex-1 overflow-y-auto px-4 py-4 space-y-4">
+      <div ref={scrollRef} className="flex-1 overflow-y-auto px-4 py-4 space-y-4 scroll-smooth">
         <AnimatePresence initial={false}>
           {visibleMessages.map((message, index) => (
             <motion.div
@@ -196,4 +203,4 @@ export function ChatSidebar({
       </div>
     </div>
   );
-}
+});
