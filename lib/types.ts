@@ -67,3 +67,27 @@ export interface ClaudeResponse {
   phase: Phase;
   confidence: number; // 0-1
 }
+
+// Scenario types for Solution Design
+export interface Scenario {
+  id: string;
+  name: string;
+  description: string;
+  approach: string;
+  pros: string[];
+  cons: string[];
+  cost: {
+    min: number;
+    max: number;
+    currency: 'SEK' | 'USD' | 'EUR';
+  };
+  timeline: string;
+  risk: 'low' | 'medium' | 'high';
+  impact: 'low' | 'medium' | 'high';
+}
+
+export interface ScenarioComparison {
+  scenarios: Scenario[];
+  recommendation?: string;
+  reasoning?: string;
+}

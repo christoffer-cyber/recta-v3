@@ -1,3 +1,5 @@
+import type { Scenario } from './types';
+
 export type CanvasState = 
   | 'empty'
   | 'phase-progress'
@@ -24,4 +26,5 @@ export interface PhaseVisualization {
   completedPhases: string[];
   insights: string[];
   confidence: number; // 0-100%
+  scenarios?: Scenario[];
 }

@@ -12,45 +12,47 @@ export const PHASE_CONFIGS: PhaseConfig[] = [
     nextPhase: 'Problem Discovery',
     welcomeMessage: `Bra jobbat! Vi har nu en tydlig bild av er situation.
 
-**Fas 1 klar:** Context
+**Context-fasen klar!** ✅
 
 Nu går vi vidare till **Problem Discovery** där vi identifierar det verkliga problemet bakom behovet.
 
-Vad är den **största utmaningen** just nu som gör att ni behöver denna person?`
+Låt oss börja: Vad är den **största utmaningen** just nu som gör att ni behöver denna person?`
   },
   {
     id: 'problem-discovery',
     name: 'Problem Discovery',
     nextPhase: 'Solution Design',
-    welcomeMessage: `Utmärkt! Vi förstår nu problemet.
+    welcomeMessage: `Perfekt! Context-fasen klar.
 
-**Fas 2 klar:** Problem Discovery
+Nu **BÖRJAR Problem Discovery** 🔍
 
-Nu går vi vidare till **Solution Design** där vi utforskar möjliga lösningar och strategier.
+Mitt mål nu är att förstå det VERKLIGA problemet bakom behovet (inte bara symptomen).
 
-Baserat på det verkliga problemet - vilka olika sätt skulle kunna lösa detta?`
+Berätta: Vilket specifikt problem försöker ni lösa genom att anställa denna person?`
   },
   {
     id: 'solution-design',
     name: 'Solution Design',
     nextPhase: 'Action Plan',
-    welcomeMessage: `Perfekt! Vi har identifierat lösningar.
+    welcomeMessage: `Utmärkt! Problem Discovery klar.
 
-**Fas 3 klar:** Solution Design
+Nu **BÖRJAR Solution Design** 💡
 
-Nu skapar vi er **Action Plan** - konkreta nästa steg.
+Jag ska nu hjälpa er designa 2-3 konkreta lösningsscenarier baserat på problemet vi identifierat.
 
-Vad är den viktigaste åtgärden att ta nu?`
+Låt mig tänka 20 sekunder och analysera möjliga vägar framåt...`
   },
   {
     id: 'action-plan',
     name: 'Action Plan',
     nextPhase: null,
-    welcomeMessage: `Grattis! Alla faser klara.
+    welcomeMessage: `Bra jobbat! Solution Design klar.
 
-**Fas 4 klar:** Action Plan
+Nu **BÖRJAR Action Plan** 📋
 
-Nu har ni en komplett strategi. Låt oss sammanfatta och skapa era deliverables.`
+Tid att skapa en konkret handlingsplan med tidslinjer och nästa steg.
+
+Vad är den viktigaste åtgärden att ta NU?`
   }
 ];
 

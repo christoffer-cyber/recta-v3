@@ -151,7 +151,7 @@ export default function Home() {
           'Skapar action plan'
         }`,
         completedPhases: [...(canvasData.phaseViz?.completedPhases || []), phaseConfig.name],
-        insights: canvasData.phaseViz?.insights || [],  // ← KEEP insights too!
+        insights: [],  // ← Clear insights for fresh start
         confidence: 0  // Reset confidence for new phase
       },
       isNewPhase: true // Mark as new phase

@@ -6,6 +6,7 @@ import { DeliverablesView } from './DeliverablesView';
 import { ConfidenceBreakdown } from './canvas/ConfidenceBreakdown';
 import { ResearchAnimation } from './canvas/ResearchAnimation';
 import { InsightsFeed } from './canvas/InsightsFeed';
+import { ScenarioComparison } from './canvas/ScenarioComparison';
 import type { CanvasState, JobDescriptionPreview, PhaseVisualization as PhaseViz } from '@/lib/canvas-types';
 import type { JobDescription, CompensationAnalysis, InterviewQuestions, SuccessPlan } from '@/lib/deliverable-schemas';
 import { PHASE_REQUIREMENTS } from '@/lib/confidence/config';
@@ -37,8 +38,9 @@ interface CanvasProps {
 
 export function Canvas({ state, data, deliverables, researchState }: CanvasProps) {
   return (
-    <div className="h-full bg-gray-50">
-      <AnimatePresence mode="wait">
+    <div className="h-full bg-gray-50 overflow-y-auto">
+      <div className="p-6">
+        <AnimatePresence mode="wait">
         {state === 'empty' && (
           <motion.div
             key="empty"
@@ -82,7 +84,7 @@ export function Canvas({ state, data, deliverables, researchState }: CanvasProps
           });
 
           return (
-            <div className="h-full overflow-y-auto p-8">
+            <div className="h-full overflow-y-auto">
               <motion.div
                 key="phase"
                 initial={{ opacity: 0 }}
@@ -111,6 +113,11 @@ export function Canvas({ state, data, deliverables, researchState }: CanvasProps
                   requiredCategories={requirements.requiredCategories}
                   optionalCategories={requirements.optionalCategories}
                 />
+              )}
+
+              {/* Scenario Comparison (Solution Design only) */}
+              {data.phaseViz.scenarios && data.phaseViz.scenarios.length > 0 && (
+                <ScenarioComparison scenarios={data.phaseViz.scenarios} />
               )}
 
               {/* Research Animation (conditional) */}
@@ -158,7 +165,8 @@ export function Canvas({ state, data, deliverables, researchState }: CanvasProps
             <DeliverablesView {...deliverables} />
           </motion.div>
         )}
-      </AnimatePresence>
+        </AnimatePresence>
+      </div>
     </div>
   );
 }
