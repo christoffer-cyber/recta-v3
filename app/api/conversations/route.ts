@@ -8,12 +8,21 @@ export const runtime = 'nodejs';
 export async function GET() {
   const session = await auth();
   
-  if (!session?.user) {
+  if (!session?.user?.id) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
+  const userId = parseInt(session.user.id as string);
+  
+  // CRITICAL: Check for NaN
+  if (isNaN(userId)) {
+    console.error('[Conversations API] Invalid userId - session.user.id:', session.user.id);
+    return NextResponse.json({ 
+      error: 'Invalid user session. Please logout and login again.' 
+    }, { status: 400 });
+  }
+
   try {
-    const userId = parseInt(session.user.id as string);
     const conversations = await getConversationsByUserId(userId);
     
     return NextResponse.json({ conversations });
@@ -30,15 +39,24 @@ export async function GET() {
 export async function POST(request: Request) {
   const session = await auth();
   
-  if (!session?.user) {
+  if (!session?.user?.id) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+
+  const userId = parseInt(session.user.id as string);
+  
+  // CRITICAL: Check for NaN
+  if (isNaN(userId)) {
+    console.error('[Conversations API] Invalid userId - session.user.id:', session.user.id);
+    return NextResponse.json({ 
+      error: 'Invalid user session. Please logout and login again.' 
+    }, { status: 400 });
   }
 
   try {
     const body = await request.json();
     const { title, company_name } = body;
     
-    const userId = parseInt(session.user.id as string);
     const conversation = await createConversation(
       userId,
       title || 'Ny analys',
