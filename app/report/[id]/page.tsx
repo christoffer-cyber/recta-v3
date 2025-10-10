@@ -6,9 +6,9 @@ import { ReportPageClient } from './ReportPageClient';
 import type { ReportData } from '@/components/report/RectaReportContent';
 
 interface PageProps {
-  params: Promise<{
+  params: {
     id: string;
-  }>;
+  };
 }
 
 export default async function ReportPage({ params }: PageProps) {
@@ -18,8 +18,7 @@ export default async function ReportPage({ params }: PageProps) {
     redirect('/login');
   }
 
-  const { id } = await params;
-  const conversationId = parseInt(id);
+  const conversationId = parseInt(params.id);
 
   if (isNaN(conversationId)) {
     return (

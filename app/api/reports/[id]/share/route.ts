@@ -8,7 +8,7 @@ export const runtime = 'nodejs';
 
 export async function POST(
   request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+  { params }: { params: { id: string } }
 ) {
   const session = await getServerSession(authOptions);
 
@@ -17,8 +17,7 @@ export async function POST(
   }
 
   try {
-    const { id } = await params;
-    const conversationId = parseInt(id);
+    const conversationId = parseInt(params.id);
     const userId = parseInt(session.user.id as string);
 
     // Verify user owns this conversation
@@ -85,7 +84,7 @@ export async function POST(
 // DELETE endpoint to disable sharing
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+  { params }: { params: { id: string } }
 ) {
   const session = await getServerSession(authOptions);
 
@@ -94,8 +93,7 @@ export async function DELETE(
   }
 
   try {
-    const { id } = await params;
-    const conversationId = parseInt(id);
+    const conversationId = parseInt(params.id);
     const userId = parseInt(session.user.id as string);
 
     // Verify ownership

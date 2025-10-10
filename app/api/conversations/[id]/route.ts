@@ -14,7 +14,7 @@ export const runtime = 'nodejs';
 // GET /api/conversations/[id]
 export async function GET(
   request: Request,
-  { params }: { params: Promise<{ id: string }> }
+  { params }: { params: { id: string } }
 ) {
   const session = await getServerSession(authOptions);
   
@@ -23,9 +23,8 @@ export async function GET(
   }
 
   try {
-    const { id } = await params;
     const userId = parseInt(session.user.id as string);
-    const conversationId = parseInt(id);
+    const conversationId = parseInt(params.id);
     
     const conversation = await getConversationById(conversationId, userId);
     
@@ -53,7 +52,7 @@ export async function GET(
 // PATCH /api/conversations/[id]
 export async function PATCH(
   request: Request,
-  { params }: { params: Promise<{ id: string }> }
+  { params }: { params: { id: string } }
 ) {
   const session = await getServerSession(authOptions);
   
@@ -62,9 +61,8 @@ export async function PATCH(
   }
 
   try {
-    const { id } = await params;
     const userId = parseInt(session.user.id as string);
-    const conversationId = parseInt(id);
+    const conversationId = parseInt(params.id);
     const body = await request.json();
     
     const conversation = await updateConversation(conversationId, userId, body);
@@ -86,7 +84,7 @@ export async function PATCH(
 // DELETE /api/conversations/[id]
 export async function DELETE(
   request: Request,
-  { params }: { params: Promise<{ id: string }> }
+  { params }: { params: { id: string } }
 ) {
   const session = await getServerSession(authOptions);
   
@@ -95,9 +93,8 @@ export async function DELETE(
   }
 
   try {
-    const { id } = await params;
     const userId = parseInt(session.user.id as string);
-    const conversationId = parseInt(id);
+    const conversationId = parseInt(params.id);
     
     const success = await deleteConversation(conversationId, userId);
     

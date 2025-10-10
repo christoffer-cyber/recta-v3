@@ -14,7 +14,7 @@ export const runtime = 'nodejs';
 // POST /api/conversations/[id]/save
 export async function POST(
   request: Request,
-  { params }: { params: Promise<{ id: string }> }
+  { params }: { params: { id: string } }
 ) {
   const session = await getServerSession(authOptions);
   
@@ -23,9 +23,8 @@ export async function POST(
   }
 
   try {
-    const { id } = await params;
     const userId = parseInt(session.user.id as string);
-    const conversationId = parseInt(id);
+    const conversationId = parseInt(params.id);
     const body = await request.json() as {
       messages?: Array<{ role: 'user' | 'assistant'; content: string; timestamp?: string }>;
       canvasData?: Record<string, unknown>;

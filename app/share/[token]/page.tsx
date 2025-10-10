@@ -4,9 +4,9 @@ import SharePageClient from './SharePageClient';
 import type { ReportData } from '@/components/report/RectaReportContent';
 
 interface SharePageProps {
-  params: Promise<{
+  params: {
     token: string;
-  }>;
+  };
 }
 
 async function getSharedReport(token: string) {
@@ -40,8 +40,7 @@ async function getSharedReport(token: string) {
 }
 
 export default async function SharePage({ params }: SharePageProps) {
-  const { token } = await params;
-  const report = await getSharedReport(token);
+  const report = await getSharedReport(params.token);
 
   if (!report) {
     notFound();
