@@ -5,6 +5,7 @@ import { exportToPDF } from '@/lib/pdf-export';
 type Props = {
   onPresentationMode?: (enabled: boolean) => void;
   onBackToChat?: () => void;
+  onShare?: () => void;
   reportTitle?: string;
   companyName?: string;
 };
@@ -12,6 +13,7 @@ type Props = {
 export default function ReportToolbar({ 
   onPresentationMode, 
   onBackToChat,
+  onShare,
   reportTitle = 'Organisationsanalys',
   companyName 
 }: Props) {
@@ -127,6 +129,25 @@ export default function ReportToolbar({
                 </svg>
                 <span>Skriv ut</span>
               </button>
+              
+              {onShare && (
+                <button 
+                  className="w-full border border-gray-300 py-2 px-4 rounded hover:bg-gray-50 transition-colors flex items-center justify-center gap-2"
+                  onClick={() => {
+                    setShowExportModal(false);
+                    onShare();
+                  }}
+                >
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <circle cx="18" cy="5" r="3"/>
+                    <circle cx="6" cy="12" r="3"/>
+                    <circle cx="18" cy="19" r="3"/>
+                    <line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/>
+                    <line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/>
+                  </svg>
+                  <span>Dela länk</span>
+                </button>
+              )}
               
               <button 
                 className="w-full mt-2 border border-gray-300 py-2 px-4 rounded hover:bg-gray-50 transition-colors"

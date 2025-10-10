@@ -45,6 +45,9 @@ CREATE TABLE IF NOT EXISTS reports (
   id SERIAL PRIMARY KEY,
   conversation_id INTEGER UNIQUE REFERENCES conversations(id) ON DELETE CASCADE NOT NULL,
   report_data JSONB NOT NULL,
+  share_token VARCHAR(64) UNIQUE,
+  share_enabled BOOLEAN DEFAULT false,
+  shared_at TIMESTAMP WITH TIME ZONE,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -55,4 +58,5 @@ CREATE INDEX IF NOT EXISTS idx_messages_conversation_id ON messages(conversation
 CREATE INDEX IF NOT EXISTS idx_messages_timestamp ON messages(timestamp);
 CREATE INDEX IF NOT EXISTS idx_canvas_states_conversation_id ON canvas_states(conversation_id);
 CREATE INDEX IF NOT EXISTS idx_reports_conversation_id ON reports(conversation_id);
+CREATE INDEX IF NOT EXISTS idx_reports_share_token ON reports(share_token);
 
