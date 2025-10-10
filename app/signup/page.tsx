@@ -2,6 +2,7 @@
 import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import { signIn } from 'next-auth/react';
 
 export default function SignupPage() {
   const [email, setEmail] = useState('');
@@ -28,6 +29,7 @@ export default function SignupPage() {
     setLoading(true);
 
     try {
+      // Step 1: Create user
       const response = await fetch('/api/auth/signup', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -40,8 +42,22 @@ export default function SignupPage() {
         throw new Error(data.error || 'Ett fel uppstod');
       }
 
-      // Redirect to login after successful signup
-      router.push('/login');
+      // Step 2: Auto-login after successful signup
+      const loginResult = await signIn('credentials', {
+        email,
+        password,
+        redirect: false,
+      });
+
+      if (loginResult?.error) {
+        // Signup succeeded but login failed - redirect to login page
+        router.push('/login?message=Konto skapat, vänligen logga in');
+        return;
+      }
+
+      // Success - redirect to dashboard
+      router.push('/dashboard');
+      router.refresh();
     } catch (err) {
       const error = err as Error;
       setError(error.message);

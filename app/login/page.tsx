@@ -2,7 +2,7 @@
 import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { signIn } from '@/auth';
+import { signIn } from 'next-auth/react';
 
 export default function LoginPage() {
   const [email, setEmail] = useState('');
@@ -17,18 +17,24 @@ export default function LoginPage() {
     setLoading(true);
 
     try {
-      const formData = new FormData();
-      formData.append('email', email);
-      formData.append('password', password);
+      const result = await signIn('credentials', {
+        email,
+        password,
+        redirect: false,
+      });
 
-      await signIn('credentials', formData);
-      
-      // If we get here, login succeeded
+      if (result?.error) {
+        setError('Fel email eller lösenord');
+        setLoading(false);
+        return;
+      }
+
+      // Success - redirect to dashboard
       router.push('/dashboard');
       router.refresh();
     } catch (err) {
       console.error('Login error:', err);
-      setError('Fel email eller lösenord');
+      setError('Ett fel uppstod vid inloggning');
       setLoading(false);
     }
   };
