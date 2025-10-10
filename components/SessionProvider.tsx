@@ -1,7 +1,7 @@
-"use client";
+'use client';
+
+import { SessionProvider as NextAuthSessionProvider } from 'next-auth/react';
 
 export function SessionProvider({ children }: { children: React.ReactNode }) {
-  // NextAuth v5 doesn't need SessionProvider wrapper
-  return <>{children}</>;
+  return <NextAuthSessionProvider>{children}</NextAuthSessionProvider>;
 }
-

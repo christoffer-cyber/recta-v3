@@ -1,23 +1,25 @@
 import { sql } from '@vercel/postgres';
-import { auth } from '@/auth';
+import { getServerSession } from 'next-auth/next';
+import { authOptions } from '@/auth';
 import { redirect } from 'next/navigation';
 import { ReportPageClient } from './ReportPageClient';
 import type { ReportData } from '@/components/report/RectaReportContent';
 
 interface PageProps {
-  params: {
+  params: Promise<{
     id: string;
-  };
+  }>;
 }
 
 export default async function ReportPage({ params }: PageProps) {
-  const session = await auth();
+  const session = await getServerSession(authOptions);
 
   if (!session?.user) {
     redirect('/login');
   }
 
-  const conversationId = parseInt(params.id);
+  const { id } = await params;
+  const conversationId = parseInt(id);
 
   if (isNaN(conversationId)) {
     return (

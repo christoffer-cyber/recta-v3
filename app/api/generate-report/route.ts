@@ -3,13 +3,14 @@ import { callClaude } from '@/lib/claude';
 import type { Message } from '@/lib/types';
 import type { ReportData } from '@/components/report/RectaReportContent';
 import { sql } from '@vercel/postgres';
-import { auth } from '@/auth';
+import { getServerSession } from 'next-auth/next';
+import { authOptions } from '@/auth';
 
 export const runtime = 'nodejs';
 
 export async function POST(request: NextRequest) {
   try {
-    const session = await auth();
+    const session = await getServerSession(authOptions);
     
     if (!session?.user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });

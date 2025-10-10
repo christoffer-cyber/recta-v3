@@ -1,12 +1,13 @@
 import { NextResponse } from 'next/server';
-import { auth } from '@/auth';
+import { getServerSession } from 'next-auth/next';
+import { authOptions } from '@/auth';
 import { createConversation, getConversationsByUserId } from '@/lib/db/conversations';
 
 export const runtime = 'nodejs';
 
 // GET /api/conversations - List all conversations
 export async function GET() {
-  const session = await auth();
+  const session = await getServerSession(authOptions);
   
   if (!session?.user?.id) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
@@ -37,7 +38,7 @@ export async function GET() {
 
 // POST /api/conversations - Create new conversation
 export async function POST(request: Request) {
-  const session = await auth();
+  const session = await getServerSession(authOptions);
   
   if (!session?.user?.id) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
