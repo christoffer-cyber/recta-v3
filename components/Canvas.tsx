@@ -5,8 +5,9 @@ import { JDPreview } from './canvas/JDPreview';
 import { DeliverablesView } from './DeliverablesView';
 import { ConfidenceBreakdown } from './canvas/ConfidenceBreakdown';
 import { ResearchAnimation } from './canvas/ResearchAnimation';
-import { InsightsFeed } from './canvas/InsightsFeed';
 import { ScenarioComparison } from './canvas/ScenarioComparison';
+import { ProgressSteps } from './canvas/ProgressSteps';
+import { DeliverableProgressCard } from './DeliverableProgressCard';
 import type { CanvasState, JobDescriptionPreview, PhaseVisualization as PhaseViz } from '@/lib/canvas-types';
 import type { JobDescription, CompensationAnalysis, InterviewQuestions, SuccessPlan } from '@/lib/deliverable-schemas';
 import { PHASE_REQUIREMENTS } from '@/lib/confidence/config';
@@ -34,11 +35,19 @@ interface CanvasProps {
     totalSources?: number;
     totalInsights?: number;
   };
+  showProgress?: boolean;
+  generatingDeliverables?: {
+    job_description: 'pending' | 'generating' | 'complete';
+    compensation_analysis: 'pending' | 'generating' | 'complete';
+    interview_questions: 'pending' | 'generating' | 'complete';
+    success_plan: 'pending' | 'generating' | 'complete';
+  };
+  conversationId?: number;
 }
 
-export function Canvas({ state, data, deliverables, researchState }: CanvasProps) {
+export function Canvas({ state, data, deliverables, researchState, showProgress, generatingDeliverables, conversationId }: CanvasProps) {
   return (
-    <div className="h-full bg-gray-50 overflow-y-auto">
+    <div className="h-full bg-gray-50 overflow-y-auto" style={{ minHeight: 0 }}>
       <div className="p-6">
         <AnimatePresence mode="wait">
         {state === 'empty' && (
@@ -73,16 +82,6 @@ export function Canvas({ state, data, deliverables, researchState }: CanvasProps
           const phaseId = data.phaseViz.currentPhase.split(' - ')[0].trim();
           const requirements = PHASE_REQUIREMENTS[phaseId];
 
-          const formattedInsights = (data.phaseViz.insights || []).map((insight, index) => {
-            const [category, ...textParts] = insight.split(':');
-            return {
-              category: category.trim(),
-              text: textParts.join(':').trim(),
-              timestamp: new Date(Date.now() - (data.phaseViz!.insights.length - index) * 60000).toISOString(),
-              isNew: index === data.phaseViz!.insights.length - 1
-            };
-          });
-
           return (
             <div className="h-full overflow-y-auto">
               <motion.div
@@ -103,6 +102,16 @@ export function Canvas({ state, data, deliverables, researchState }: CanvasProps
                 </p>
               </div>
 
+              {/* Progress Steps (when active) */}
+              {showProgress && (
+                <ProgressSteps 
+                  isActive={showProgress}
+                  onComplete={() => {
+                    console.log('[Progress] Complete!');
+                  }}
+                />
+              )}
+
               {/* Confidence Breakdown */}
               {requirements && (
                 <ConfidenceBreakdown
@@ -120,6 +129,51 @@ export function Canvas({ state, data, deliverables, researchState }: CanvasProps
                 <ScenarioComparison scenarios={data.phaseViz.scenarios} />
               )}
 
+              {/* Deliverables Generation Progress */}
+              {generatingDeliverables && (
+                generatingDeliverables.job_description !== 'pending' ||
+                generatingDeliverables.compensation_analysis !== 'pending' ||
+                generatingDeliverables.interview_questions !== 'pending' ||
+                generatingDeliverables.success_plan !== 'pending'
+              ) && (
+                <div className="mb-6">
+                  <h3 className="text-lg font-semibold mb-4 text-gray-900 flex items-center gap-2">
+                    <span>📦</span>
+                    <span>Genererar Dokument</span>
+                  </h3>
+                  
+                  <div className="space-y-3">
+                    <DeliverableProgressCard
+                      title="job_description"
+                      status={generatingDeliverables.job_description}
+                      content={deliverables?.jobDescription}
+                      conversationId={conversationId}
+                    />
+                    
+                    <DeliverableProgressCard
+                      title="compensation_analysis"
+                      status={generatingDeliverables.compensation_analysis}
+                      content={deliverables?.compensation}
+                      conversationId={conversationId}
+                    />
+                    
+                    <DeliverableProgressCard
+                      title="interview_questions"
+                      status={generatingDeliverables.interview_questions}
+                      content={deliverables?.interviewQuestions}
+                      conversationId={conversationId}
+                    />
+                    
+                    <DeliverableProgressCard
+                      title="success_plan"
+                      status={generatingDeliverables.success_plan}
+                      content={deliverables?.successPlan}
+                      conversationId={conversationId}
+                    />
+                  </div>
+                </div>
+              )}
+
               {/* Research Animation (conditional) */}
               {researchState && (
                 <ResearchAnimation
@@ -130,12 +184,6 @@ export function Canvas({ state, data, deliverables, researchState }: CanvasProps
                   totalInsights={researchState.totalInsights}
                 />
               )}
-
-              {/* Insights Feed */}
-              <InsightsFeed 
-                insights={formattedInsights}
-                maxVisible={5}
-              />
               </motion.div>
             </div>
           );

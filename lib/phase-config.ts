@@ -46,13 +46,13 @@ Låt mig tänka 20 sekunder och analysera möjliga vägar framåt...`
     id: 'action-plan',
     name: 'Action Plan',
     nextPhase: null,
-    welcomeMessage: `Bra jobbat! Solution Design klar.
+    welcomeMessage: `Utmärkt! Nu har ni valt lösningsväg.
 
 Nu **BÖRJAR Action Plan** 📋
 
-Tid att skapa en konkret handlingsplan med tidslinjer och nästa steg.
+För att skapa en konkret, körbar handlingsplan med tidslinjer och nästa steg...
 
-Vad är den viktigaste åtgärden att ta NU?`
+**Vem äger rekryteringsprocessen?** (VD, HR, eller någon annan?)`
   }
 ];
 

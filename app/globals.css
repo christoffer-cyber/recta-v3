@@ -19,8 +19,21 @@
   }
 }
 
-body {
+html, body {
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+  height: 100%;
+  width: 100%;
+  position: fixed;
   background: var(--background);
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
+}
+
+/* Ensure root div also has proper sizing */
+#__next, [id^="__next"] {
+  height: 100%;
+  width: 100%;
+  overflow: hidden;
 }

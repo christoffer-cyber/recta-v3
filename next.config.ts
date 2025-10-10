@@ -1,7 +1,7 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  /* config options here */
+  // No longer need external packages with bcryptjs
 };
 
 export default nextConfig;

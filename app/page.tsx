@@ -1,6 +1,8 @@
 'use client';
 
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback, Suspense } from 'react';
+import { useSearchParams, useRouter } from 'next/navigation';
+import { useAuth } from '@/lib/hooks/useAuth';
 import { Layout } from '@/components/Layout';
 import { ChatSidebar } from '@/components/ChatSidebar';
 import { Canvas } from '@/components/Canvas';
@@ -9,6 +11,14 @@ import { getPhaseConfig } from '@/lib/phase-config';
 import { deduplicateInsights } from '@/lib/insight-utils';
 import type { CanvasState, PhaseVisualization } from '@/lib/canvas-types';
 import type { JobDescription, CompensationAnalysis, InterviewQuestions, SuccessPlan, DeliverableType } from '@/lib/deliverable-schemas';
+import ReportLayout from '@/components/report/ReportLayout';
+import ReportToolbar from '@/components/report/ReportToolbar';
+import ReportNavigation from '@/components/report/ReportNavigation';
+import ReportToolboxPanel from '@/components/report/ReportToolboxPanel';
+import { RectaReportContent, type ReportData } from '@/components/report/RectaReportContent';
+import { InsightsSidebar } from '@/components/InsightsSidebar';
+import { formatDistanceToNow } from 'date-fns';
+import { sv } from 'date-fns/locale';
 
 // Get phase-specific wrap-up message
 function getPhaseWrapUpMessage(phaseName: string): string {
@@ -47,7 +57,16 @@ Nu kan vi skapa era deliverables!`
   return phaseMessages[basePhase] || phaseMessages['Context'];
 }
 
-export default function Home() {
+function HomeContent() {
+  const { user, loading: authLoading } = useAuth();
+  const searchParams = useSearchParams();
+  const router = useRouter();
+  const conversationIdFromUrl = searchParams?.get('conversation');
+  
+  const [conversationId, setConversationId] = useState<number | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
+  const [lastSaved, setLastSaved] = useState<Date | null>(null);
+  
   const [messages, setMessages] = useState<Message[]>([
     {
       role: 'assistant',
@@ -81,6 +100,26 @@ export default function Home() {
     successPlan?: SuccessPlan;
   }>({});
 
+  // Deliverable generation state tracking
+  const [generatingDeliverables, setGeneratingDeliverables] = useState<{
+    job_description: 'pending' | 'generating' | 'complete';
+    compensation_analysis: 'pending' | 'generating' | 'complete';
+    interview_questions: 'pending' | 'generating' | 'complete';
+    success_plan: 'pending' | 'generating' | 'complete';
+  }>({
+    job_description: 'pending',
+    compensation_analysis: 'pending',
+    interview_questions: 'pending',
+    success_plan: 'pending',
+  });
+
+  // Report state
+  const [reportData, setReportData] = useState<ReportData | null>(null);
+  const [showReport, setShowReport] = useState(false);
+  
+  // Progress state
+  const [showProgress, setShowProgress] = useState(false);
+
   // Scroll preservation ref
   const chatContainerRef = useRef<HTMLDivElement>(null);
   const previousHeightRef = useRef<number>(0);
@@ -108,7 +147,7 @@ export default function Home() {
   }, [canvasData]);
 
   const currentPhase = canvasData.phaseViz?.currentPhase || 'Context';
-  const phaseComplete = (canvasData.phaseViz?.confidence || 0) >= 100;
+  const phaseComplete = (canvasData.phaseViz?.confidence || 0) >= 90;
   const phaseConfig = getPhaseConfig(currentPhase);
   const isActionPlan = currentPhase.toLowerCase().includes('action');
 
@@ -168,6 +207,7 @@ export default function Home() {
   // ADD THIS NEW FUNCTION after handleAdvancePhase
   const generateScenariosAutomatically = async () => {
     setIsGeneratingScenarios(true);
+    setShowProgress(true);
     
     try {
       // CRITICAL: Collect insights from BOTH Context and Problem Discovery phases
@@ -234,6 +274,7 @@ Vilken av dessa scenarios känns mest rätt för er situation?`,
       
       setMessages(prev => [...prev, fallbackMessage]);
     } finally {
+      setShowProgress(false);
       setIsGeneratingScenarios(false);
     }
   };
@@ -340,10 +381,17 @@ Vilken av dessa scenarios känns mest rätt för er situation?`,
         'success_plan'
       ];
 
-      console.log('[Generate] Starting deliverable generation...');
+      console.log('[Generate] Starting sequential deliverable generation...');
 
-      const results = await Promise.all(
-        types.map(async (type) => {
+      // Generate SEQUENTIALLY to show progress
+      for (const type of types) {
+        // Set to generating
+        setGeneratingDeliverables(prev => ({
+          ...prev,
+          [type]: 'generating'
+        }));
+
+        try {
           const response = await fetch('/api/generate', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -358,23 +406,37 @@ Vilken av dessa scenarios känns mest rätt för er situation?`,
           }
 
           const data = await response.json();
-          return { type, deliverable: data.deliverable };
-        })
-      );
+          
+          // Update deliverables state
+          setDeliverables(prev => {
+            const newDeliverables = { ...prev };
+            if (type === 'job_description') newDeliverables.jobDescription = data.deliverable;
+            else if (type === 'compensation_analysis') newDeliverables.compensation = data.deliverable;
+            else if (type === 'interview_questions') newDeliverables.interviewQuestions = data.deliverable;
+            else if (type === 'success_plan') newDeliverables.successPlan = data.deliverable;
+            return newDeliverables;
+          });
 
-      const newDeliverables: {
-        jobDescription?: JobDescription;
-        compensation?: CompensationAnalysis;
-        interviewQuestions?: InterviewQuestions;
-        successPlan?: SuccessPlan;
-      } = {};
-      
-      for (const result of results) {
-        if (result.type === 'job_description') newDeliverables.jobDescription = result.deliverable;
-        else if (result.type === 'compensation_analysis') newDeliverables.compensation = result.deliverable;
-        else if (result.type === 'interview_questions') newDeliverables.interviewQuestions = result.deliverable;
-        else if (result.type === 'success_plan') newDeliverables.successPlan = result.deliverable;
+          // Mark as complete
+          setGeneratingDeliverables(prev => ({
+            ...prev,
+            [type]: 'complete'
+          }));
+
+          console.log(`[Generate] ✓ ${type} complete`);
+
+        } catch (error) {
+          console.error(`[Generate] Error generating ${type}:`, error);
+          
+          // Mark as pending (failed)
+          setGeneratingDeliverables(prev => ({
+            ...prev,
+            [type]: 'pending'
+          }));
+        }
       }
+
+      const newDeliverables = deliverables;
 
       setDeliverables(newDeliverables);
       setCanvasState('deliverables');
@@ -387,6 +449,303 @@ Vilken av dessa scenarios känns mest rätt för er situation?`,
     } finally {
       setIsGenerating(false);
     }
+  };
+
+  const handleGenerateReport = async () => {
+    setIsGenerating(true);
+    
+    try {
+      console.log('[Generate Report] Starting...');
+      
+      // Try to extract selected scenario from recent messages
+      const recentMessages = messages.slice(-10);
+      let selectedScenarioName = '';
+      
+      // Look for user's scenario choice in recent messages
+      for (const msg of recentMessages.reverse()) {
+        if (msg.role === 'user' && canvasData.phaseViz?.scenarios) {
+          // Check if message mentions any scenario name
+          for (const scenario of canvasData.phaseViz.scenarios) {
+            if (msg.content.toLowerCase().includes(scenario.name.toLowerCase())) {
+              selectedScenarioName = scenario.name;
+              break;
+            }
+          }
+          if (selectedScenarioName) break;
+        }
+      }
+      
+      const response = await fetch('/api/generate-report', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          messages: messages,
+          scenarios: canvasData.phaseViz?.scenarios || [],
+          conversationId: conversationId,
+          selectedScenario: {
+            name: selectedScenarioName || 'Första alternativet'
+          }
+        })
+      });
+
+      const data = await response.json();
+      
+      if (data.reportData) {
+        setReportData(data.reportData);
+        setShowReport(true);
+        console.log('[Generate Report] Success!');
+      }
+
+    } catch (error) {
+      console.error('Error generating report:', error);
+      alert('Ett fel uppstod när rapporten skulle genereras');
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
+  const handleScenarioSelect = async (scenario: Scenario) => {
+    // Add user message
+    const userMessage: Message = {
+      role: 'user',
+      content: `Jag väljer alternativ: ${scenario.name}`,
+      timestamp: new Date().toISOString()
+    };
+    
+    setMessages(prev => [...prev, userMessage]);
+    setIsLoading(true);
+    
+    // Simulate AI response
+    setTimeout(() => {
+      const aiResponse: Message = {
+        role: 'assistant',
+        content: `Utmärkt val! ${scenario.name} är ett smart beslut baserat på era behov.\n\nLåt mig fråga lite mer om implementation och timeline för att säkerställa att vi har alla detaljer på plats.`,
+        timestamp: new Date().toISOString()
+      };
+      
+      setMessages(prev => [...prev, aiResponse]);
+      
+      // Update insights and confidence
+      setCanvasData(prev => ({
+        ...prev,
+        phaseViz: {
+          ...prev.phaseViz!,
+          insights: [
+            ...(prev.phaseViz?.insights || []),
+            `Preferens: Valde ${scenario.name} för ${scenario.cost.min / 1000}-${scenario.cost.max / 1000}k SEK`
+          ],
+          confidence: Math.min(100, (prev.phaseViz?.confidence || 0) + 15)
+        }
+      }));
+      
+      setIsLoading(false);
+    }, 1500);
+  };
+
+  // AUTO-SAVE: Save conversation function
+  const saveConversation = useCallback(async () => {
+    if (!conversationId) return;
+    
+    setIsSaving(true);
+    
+    try {
+      const currentPhase = canvasData.phaseViz?.currentPhase.split(' - ')[0].trim() || 'Context';
+      
+      const response = await fetch(`/api/conversations/${conversationId}/save`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          messages,
+          canvasData,
+          currentPhase,
+        }),
+      });
+
+      if (response.ok) {
+        setLastSaved(new Date());
+      }
+    } catch (error) {
+      console.error('Error saving conversation:', error);
+    } finally {
+      setIsSaving(false);
+    }
+  }, [conversationId, messages, canvasData]);
+
+  // AUTO-SAVE: Trigger save when messages/canvas change
+  useEffect(() => {
+    if (conversationId && messages.length > 1) {
+      const timer = setTimeout(() => {
+        saveConversation();
+      }, 2000);
+
+      return () => clearTimeout(timer);
+    }
+  }, [conversationId, messages, canvasData, saveConversation]);
+
+  // LOAD: Load existing conversation from URL
+  useEffect(() => {
+    const loadConversation = async (id: string) => {
+      try {
+        const response = await fetch(`/api/conversations/${id}`);
+        const data = await response.json();
+
+        if (data.conversation) {
+          setConversationId(parseInt(id));
+          setMessages(data.messages || []);
+          if (data.canvasData) {
+            setCanvasData(data.canvasData);
+          }
+        }
+      } catch (error) {
+        console.error('Error loading conversation:', error);
+      }
+    };
+
+    if (conversationIdFromUrl && !conversationId) {
+      loadConversation(conversationIdFromUrl);
+    }
+  }, [conversationIdFromUrl, conversationId]);
+
+  // CREATE: Create new conversation on mount
+  useEffect(() => {
+    const createNewConversation = async () => {
+      try {
+        const response = await fetch('/api/conversations', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ title: 'Ny analys' }),
+        });
+
+        const data = await response.json();
+        if (data.conversation) {
+          setConversationId(data.conversation.id);
+        }
+      } catch (error) {
+        console.error('Error creating conversation:', error);
+      }
+    };
+
+    if (user && !conversationId && !conversationIdFromUrl) {
+      createNewConversation();
+    }
+  }, [user, conversationId, conversationIdFromUrl]);
+
+  // REDIRECT: Redirect to login if not authenticated
+  useEffect(() => {
+    if (!authLoading && !user) {
+      router.push('/login');
+    }
+  }, [authLoading, user, router]);
+
+  // PREVENT LEAVE: Warn before leaving with unsaved work
+  useEffect(() => {
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (messages.length > 1 && isSaving) {
+        e.preventDefault();
+        e.returnValue = '';
+      }
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, [messages, isSaving]);
+
+  // LOADING: Show loading state while authenticating
+  if (authLoading) {
+  return (
+      <div className="h-screen w-screen flex items-center justify-center bg-gray-50">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">Laddar...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!user) return null;
+
+  // REPORT VIEW - Render if report is ready
+  if (showReport && reportData) {
+    const toolboxItems = [
+      {
+        title: 'Job Description',
+        subtitle: deliverables.jobDescription ? 'Klar att publicera' : 'Inte genererad än',
+        onClick: () => {
+          if (deliverables.jobDescription) {
+            setCanvasState('deliverables');
+            setShowReport(false);
+          }
+        }
+      },
+      {
+        title: 'Interview Questions',
+        subtitle: deliverables.interviewQuestions ? 'Strukturerad guide' : 'Inte genererad än',
+        onClick: () => {
+          if (deliverables.interviewQuestions) {
+            setCanvasState('deliverables');
+            setShowReport(false);
+          }
+        }
+      },
+      {
+        title: '90-Day Success Plan',
+        subtitle: deliverables.successPlan ? '30-60-90 milestones' : 'Inte genererad än',
+        onClick: () => {
+          if (deliverables.successPlan) {
+            setCanvasState('deliverables');
+            setShowReport(false);
+          }
+        }
+      },
+      {
+        title: 'Compensation Analysis',
+        subtitle: deliverables.compensation ? 'Market benchmarks' : 'Inte genererad än',
+        onClick: () => {
+          if (deliverables.compensation) {
+            setCanvasState('deliverables');
+            setShowReport(false);
+          }
+        }
+      }
+    ];
+
+    const navItems = [
+      { id: 'slide-1', label: 'Cover' },
+      { id: 'slide-2', label: 'Executive Summary' },
+      { id: 'slide-3', label: 'Problem Analysis' },
+      { id: 'slide-4', label: 'Solution Scenarios' },
+      { id: 'slide-5', label: 'Selected Solution' },
+      { id: 'slide-6', label: 'Cost Analysis' },
+      { id: 'slide-7', label: 'Timeline' },
+      { id: 'slide-8', label: 'Recommendations' },
+      { id: 'slide-9', label: 'Next Steps' },
+      { id: 'slide-10', label: 'Thank You' }
+    ];
+
+    return (
+      <>
+        <ReportToolbar onBackToChat={() => setShowReport(false)} />
+        <ReportLayout
+          left={<ReportToolboxPanel items={toolboxItems} onItemClick={(item) => item.onClick?.()} />}
+          right={<ReportNavigation items={navItems} />}
+        >
+          <RectaReportContent data={reportData} />
+        </ReportLayout>
+      </>
+    );
+  }
+
+  // Format insights for sidebar
+  const formatInsightsForSidebar = (insights: string[]) => {
+    return insights.map((insight, index) => {
+      const [category, ...textParts] = insight.split(':');
+      return {
+        category: category.trim(),
+        text: textParts.join(':').trim(),
+        timestamp: new Date(Date.now() - (insights.length - index) * 60000).toISOString(),
+        isNew: index === insights.length - 1
+      };
+    });
   };
 
   return (
@@ -403,10 +762,44 @@ Vilken av dessa scenarios känns mest rätt för er situation?`,
           onGenerateDeliverables={handleGenerateDeliverables}
           isGenerating={isGenerating}
           isActionPlan={isActionPlan}
+          onGenerateReport={handleGenerateReport}
+          scenarios={canvasData.phaseViz?.scenarios}
+          onScenarioSelect={handleScenarioSelect}
+          isGeneratingScenarios={isGeneratingScenarios}
         />
       }
-      canvas={<Canvas state={canvasState} data={canvasData} deliverables={deliverables} researchState={undefined} />}
+      canvas={<Canvas state={canvasState} data={canvasData} deliverables={deliverables} researchState={undefined} showProgress={showProgress} generatingDeliverables={generatingDeliverables} conversationId={conversationId ?? undefined} />}
+      insights={
+        <InsightsSidebar 
+          phase={currentPhase}
+          insights={formatInsightsForSidebar(canvasData.phaseViz?.insights || [])}
+          confidence={canvasData.phaseViz?.confidence || 0}
+        />
+      }
       currentPhase={currentPhase}
-    />
+    >
+      {/* Saving indicator */}
+      {isSaving && <span className="text-gray-500">Sparar...</span>}
+      {!isSaving && lastSaved && (
+        <span className="text-gray-500">
+          Sparad {formatDistanceToNow(new Date(lastSaved), { addSuffix: true, locale: sv })}
+        </span>
+      )}
+    </Layout>
+  );
+}
+
+export default function Home() {
+  return (
+    <Suspense fallback={
+      <div className="h-screen w-screen flex items-center justify-center bg-gray-50">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">Laddar...</p>
+        </div>
+      </div>
+    }>
+      <HomeContent />
+    </Suspense>
   );
 }
