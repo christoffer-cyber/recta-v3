@@ -2,7 +2,6 @@
 import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { signIn } from 'next-auth/react';
 
 export default function SignupPage() {
   const [email, setEmail] = useState('');
@@ -30,36 +29,46 @@ export default function SignupPage() {
 
     try {
       // Step 1: Create user
-      const response = await fetch('/api/auth/signup', {
+      const signupResponse = await fetch('/api/auth/signup', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, password }),
       });
 
-      const data = await response.json();
+      const signupData = await signupResponse.json();
 
-      if (!response.ok) {
-        throw new Error(data.error || 'Ett fel uppstod');
+      if (!signupResponse.ok) {
+        throw new Error(signupData.error || 'Ett fel uppstod');
       }
 
-      // Step 2: Auto-login after successful signup
-      const loginResult = await signIn('credentials', {
-        email,
-        password,
-        redirect: false,
+      console.log('✅ User created, attempting auto-login...');
+
+      // Step 2: Auto-login
+      const formData = new FormData();
+      formData.append('email', email);
+      formData.append('password', password);
+      formData.append('callbackUrl', '/dashboard');
+
+      const loginResponse = await fetch('/api/auth/callback/credentials', {
+        method: 'POST',
+        body: formData,
       });
 
-      if (loginResult?.error) {
-        // Signup succeeded but login failed - redirect to login page
+      if (!loginResponse.ok) {
+        // Signup succeeded but login failed - redirect to login
+        console.log('⚠️ Auto-login failed, redirecting to login page');
         router.push('/login?message=Konto skapat, vänligen logga in');
         return;
       }
 
-      // Success - redirect to dashboard
+      // Success!
+      console.log('✅ Auto-login successful, redirecting to dashboard');
       router.push('/dashboard');
       router.refresh();
+      
     } catch (err) {
       const error = err as Error;
+      console.error('❌ Signup error:', error);
       setError(error.message);
       setLoading(false);
     }
