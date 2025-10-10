@@ -56,7 +56,11 @@ export function ReportPageClient({ reportData, conversationId }: ReportPageClien
       </div>
 
       {/* Toolbar */}
-      <ReportToolbar onPresentationMode={setPresentationMode} />
+      <ReportToolbar 
+        onPresentationMode={setPresentationMode}
+        reportTitle="Organisationsanalys"
+        companyName={reportData.company?.name}
+      />
 
       {/* Main report layout */}
       <div className="flex-1 overflow-hidden">
@@ -64,7 +68,9 @@ export function ReportPageClient({ reportData, conversationId }: ReportPageClien
           left={<ReportToolboxPanel items={toolboxItems} />}
           right={<ReportNavigation items={navItems} />}
         >
-          <RectaReportContent data={reportData} />
+          <div id="report-content" className="bg-white">
+            <RectaReportContent data={reportData} />
+          </div>
         </ReportLayout>
       </div>
     </div>

@@ -37,3 +37,53 @@ html, body {
   width: 100%;
   overflow: hidden;
 }
+
+/* Print styles */
+@media print {
+  body {
+    background: white !important;
+    overflow: visible !important;
+    position: static !important;
+  }
+
+  /* Hide non-essential elements */
+  nav,
+  button,
+  .no-print,
+  header,
+  [class*="Toolbar"],
+  [class*="Navigation"],
+  [class*="Toolbox"] {
+    display: none !important;
+  }
+
+  /* Ensure content fits on page */
+  #report-content {
+    max-height: none !important;
+    overflow: visible !important;
+    padding: 0 !important;
+    margin: 0 !important;
+  }
+
+  /* Page breaks */
+  h1, h2, h3 {
+    page-break-after: avoid;
+    page-break-inside: avoid;
+  }
+
+  pre, blockquote, table {
+    page-break-inside: avoid;
+  }
+
+  /* Adjust margins */
+  @page {
+    margin: 2cm;
+    size: A4;
+  }
+
+  /* Ensure colors print */
+  * {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+}
