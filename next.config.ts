@@ -1,7 +1,8 @@
-import type { NextConfig } from "next";
+import type { NextConfig } from 'next';
 
 const nextConfig: NextConfig = {
-  // No longer need external packages with bcryptjs
+  reactStrictMode: true,
+  // No experimental features needed for Next.js 14
 };
 
 export default nextConfig;

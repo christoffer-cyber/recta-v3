@@ -1,37 +1,20 @@
-import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
-import "./globals.css";
-import { SessionProvider } from "@/components/SessionProvider";
+import './globals.css';
+import { Providers } from './providers';
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
-  subsets: ["latin"],
-});
-
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
-  subsets: ["latin"],
-});
-
-export const metadata: Metadata = {
-  title: "Recta - AI Powered Organizational Intelligence",
-  description: "Professionell organisationsdesign på minuter, inte månader. Recta är AI-copiloten som hjälper tillväxtföretag bygga rätt team.",
-  keywords: ['organisationsdesign', 'rekrytering', 'AI', 'HR', 'tillväxtföretag'],
+export const metadata = {
+  title: 'Recta - AI-Powered Organizational Intelligence',
+  description: 'Smart rekrytering och org-design för växande företag',
 };
 
 export default function RootLayout({
   children,
-}: Readonly<{
+}: {
   children: React.ReactNode;
-}>) {
+}) {
   return (
     <html lang="sv">
-      <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased`}
-      >
-        <SessionProvider>
-          {children}
-        </SessionProvider>
+      <body className="antialiased">
+        <Providers>{children}</Providers>
       </body>
     </html>
   );
