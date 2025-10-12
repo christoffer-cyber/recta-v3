@@ -52,100 +52,51 @@ function buildContextSection(
   config: PhasePromptConfig,
   isNewPhase?: boolean
 ): string {
-  // CRITICAL: If brand new phase with 0 confidence, start completely fresh
-  if (isNewPhase && confidence < 15) {
-    return `## 🚨 VIKTIGT: DETTA ÄR EN NY FAS 🚨
+  // SIMPLE: If no insights or very low confidence, start fresh
+  if (insights.length === 0 || confidence < 20) {
+    return `## NUVARANDE SITUATION:
+Vi har INTE samlat information än (${confidence}% confidence).
 
-Du har precis börjat fasen: ${config.role.split('Du är')[1] || 'denna fas'}
+**DIN UPPGIFT:** Ställ frågor för att samla:
 
-**IGNORERA all tidigare konversation om andra faser.**
-
-Din ENDA uppgift nu är att samla information om:
-
-REQUIRED (MÅSTE ha):
+REQUIRED (måste ha):
 ${config.insightCategories.required.map(c => `- ${c}`).join('\n')}
 
-OPTIONAL (Bonus):
+OPTIONAL (bonus):
 ${config.insightCategories.optional.map(c => `- ${c}`).join('\n')}
 
-**Confidence är ${confidence}% - du har INTE nog information än.**
-
-**SÄG INTE "vi är klara" eller "redo att gå vidare".**
-**BÖRJA ställa frågor relevanta för DENNA fas.**`;
+**BÖRJA med att ställa EN fråga om en av required kategorierna.**`;
   }
 
-  // If no insights yet
-  if (insights.length === 0) {
-    return `## NUVARANDE KONTEXT:
-Inga insights samlade än (${confidence}% confidence).
-
-Börja samla dessa REQUIRED kategorier:
-${config.insightCategories.required.map(c => `- ${c}`).join('\n')}
-
-Valfria kategorier (bonus):
-${config.insightCategories.optional.map(c => `- ${c}`).join('\n')}`;
-  }
-
-  // Filter insights - ONLY show phase-relevant ones
-  const relevantCategories = [
-    ...config.insightCategories.required,
-    ...config.insightCategories.optional
-  ];
-  
-  const relevantInsights = insights.filter(insight => {
-    const category = insight.split(':')[0].trim();
-    return relevantCategories.some(reqCat => 
-      category.toLowerCase().includes(reqCat.toLowerCase()) ||
-      reqCat.toLowerCase().includes(category.toLowerCase())
-    );
-  });
-
-  // If NO relevant insights for THIS phase, treat as fresh start
-  if (relevantInsights.length === 0 && confidence < 30) {
-    return `## NUVARANDE KONTEXT:
-
-Vi har information från tidigare fas, men för DENNA fas (${confidence}% confidence) behöver vi samla:
-
-REQUIRED:
-${config.insightCategories.required.map(c => `- ${c}`).join('\n')}
-
-**Börja ställ frågor relevanta för dessa kategorier.**`;
-  }
-
-  // Show only relevant insights
-  const grouped = groupInsightsByCategory(relevantInsights);
-  const deduplicatedInsights = Array.from(new Set(relevantInsights));
-
-  // Check coverage
+  // Show what we have
+  const grouped = groupInsightsByCategory(insights);
   const missingRequired = config.insightCategories.required.filter(
     cat => !grouped[cat] || grouped[cat].length === 0
   );
 
-  let coverageStatus = '';
+  let status = '';
   if (missingRequired.length > 0) {
-    coverageStatus = `
+    status = `
 
-**SAKNAS REQUIRED KATEGORIER (fokusera här):**
-${missingRequired.map(c => `- ${c} ← FRÅGA OM DETTA!`).join('\n')}
-
-**Du har INTE tillräckligt för att gå vidare än.**`;
+**SAKNAS (fråga om dessa):**
+${missingRequired.map(c => `- ${c}`).join('\n')}`;
   } else if (confidence < 90) {
-    coverageStatus = `
+    status = `
 
-✓ Required kategorier täckta, men confidence endast ${confidence}%.
-**Fortsätt samla mer detaljer innan du säger "klart".**`;
+**Fortsätt samla mer detaljer (confidence: ${confidence}%)**`;
   } else {
-    coverageStatus = '\n\n✓ Alla required kategorier täckta med hög confidence!';
+    status = `
+
+**✓ Klar! (confidence: ${confidence}%)**`;
   }
 
-  return `## NUVARANDE KONTEXT:
-Vi har samlat ${relevantInsights.length} relevanta insights för denna fas (${confidence}% confidence):
+  return `## NUVARANDE SITUATION:
+Vi har samlat (${confidence}% confidence):
 
-${deduplicatedInsights.slice(0, 8).map((insight, i) => `${i + 1}. ${insight}`).join('\n')}
-${deduplicatedInsights.length > 8 ? `... och ${deduplicatedInsights.length - 8} till` : ''}
-${coverageStatus}
+${insights.slice(0, 5).map((insight, i) => `${i + 1}. ${insight}`).join('\n')}
+${insights.length > 5 ? `... och ${insights.length - 5} till` : ''}${status}
 
-**Bygg på dessa insights - fortsätt ställa frågor tills confidence når 90%+.**`;
+**Fortsätt ställa frågor tills confidence når 90%+.**`;
 }
 
 function groupInsightsByCategory(insights: string[]): Record<string, string[]> {
@@ -163,33 +114,23 @@ function groupInsightsByCategory(insights: string[]): Record<string, string[]> {
 
 function buildBehaviorGuidelines(): string {
   return `## KONVERSATIONSSTIL:
-- Var samtalsam och naturlig, inte robotisk
-- Ställ EN fråga åt gången (max två om nära relaterade)
-- Lyssna aktivt - referera till vad användaren sa tidigare
-- Använd "Jag förstår" och "Det låter vettigt" för att visa förståelse
-- Utmana antaganden artigt när det behövs
-- Var koncis - undvik långa förklaringar om inte ombedd
-- Naturlig svenska (du kan mixa in engelska termer när lämpligt)
+- Var vänlig och professionell
+- Ställ EN fråga åt gången
+- Lyssna på svaren och bygg vidare
+- Använd naturlig svenska
 
-## 🚨 KRITISKT - FAS-REGLER:
-- SÄG ALDRIG "vi är klara" eller "redo att gå vidare" förrän confidence är 90%+
-- SÄG ALDRIG "perfekt, låt oss gå vidare" om du inte samlat ALL required information
+## KRITISKA REGLER:
+- SÄG ALDRIG bara "Tack för informationen!" - ställ alltid en följdfråga
 - Om confidence < 90%: FORTSÄTT STÄLLA FRÅGOR
-- Varje fas måste genomföras ordentligt - INGEN genväg
+- Ställ frågor om saknade kategorier (se ovan)
+- Extrahera insights i KATEGORI-format (se nedan)
 
-## RESEARCH-ANVÄNDNING (om tillgänglig):
-När research-kontext finns:
-- Referera insights naturligt: "Jag ser att företag i liknande situation..."
-- Använd för att validera tänkande: "Det stämmer med vad som brukar fungera..."
-- SÄG ALDRIG "research shows" eller "enligt data"
-- Visa bara informerad förståelse
+## EXEMPEL PÅ BRA SÄTT ATT SVARA:
+❌ DÅLIGT: "Tack för informationen!"
+✅ BRA: "Tack! Nu förstår jag att ni är 25 personer. Vilken typ av roll letar ni efter?"
 
-## VIKTIGA REGLER:
-- Extrahera insights kontinuerligt i KATEGORI-format (se nedan)
-- Upprepa inte frågor om info vi redan har
-- Utveckla konversationen mot att täcka saknade kategorier
-- Kvalitet över kvantitet - bara substantial insights
-- Varje insight ska vara specifik och actionable`;
+❌ DÅLIGT: "Okej, bra."
+✅ BRA: "Perfekt! Ni söker alltså en CTO. Berätta mer om er nuvarande tech-stack - vilka teknologier använder ni?"`;
 }
 
 function buildInsightExtraction(config: PhasePromptConfig): string {
