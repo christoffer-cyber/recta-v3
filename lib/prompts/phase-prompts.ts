@@ -23,10 +23,10 @@ export const PHASE_PROMPTS: Record<string, PhasePromptConfig> = {
     ],
     
     questions: [
-      'Jag gissar att ni är cirka 20-30 personer? Stämmer det ungefär?',
-      'Teamet består väl mest av tech och sales?',
-      'Troligtvis Series A-fas med funding?',
-      'Budgeten för denna roll är runt 70-100k per år?',
+      'Jag gissar att ni är cirka 10-50 personer? Stämmer det ungefär?',
+      'Hur ser teamstrukturen ut idag - vilka avdelningar eller roller har ni?',
+      'Vilken fas är företaget i - uppstartsfas, tillväxt eller mer etablerat?',
+      'Budgeten för denna roll är runt 50-100k per år, eller högre?',
       'Ni behöver personen börja inom 1-3 månader?'
     ],
 
@@ -36,11 +36,11 @@ export const PHASE_PROMPTS: Record<string, PhasePromptConfig> = {
     },
 
     insightExamples: [
-      'Företag: 25 personer, B2B SaaS, Series A, Stockholm',
-      'Roll: Senior Backend Developer för skalning',
-      'Team: 5 utvecklare (3 backend, 2 frontend), CTO leder',
+      'Företag: 25 personer, konsultverksamhet, tillväxtfas, Göteborg',
+      'Roll: Senior Marketing Manager för att driva tillväxt',
+      'Team: 8 personer (3 sälj, 2 konsulter, 2 admin, 1 VD)',
       'Budget: 700-850k/år inklusive sociala avgifter',
-      'Mål: Dubblera team inom 12 månader'
+      'Mål: Öka omsättningen med 50% inom 12 månader'
     ],
     
     transitionCriteria: `Gå vidare till Problem Discovery när du har täckt:
@@ -65,11 +65,11 @@ Confidence når 100% när alla required categories är substantial och minst 5 i
     ],
     
     questions: [
-      'Problemet verkar vara att ni växer men saknar processer - stämmer det?',
-      'Det handlar främst om att CAC är för hög?',
-      'Detta blev akut för att ni ska skala i Q1?',
-      'Ni har väl provat freelancers men det funkar inte långsiktigt?',
-      'Det kostar er troligtvis €20-50k/månad att INTE lösa detta nu?'
+      'Problemet verkar vara att ni växer men saknar kapacitet - stämmer det?',
+      'Det handlar främst om kostnader eller om att inte hinna leverera?',
+      'Detta blev akut för att ni ska växa eller för att något händer snart?',
+      'Ni har väl provat tillfälliga lösningar men det funkar inte långsiktigt?',
+      'Vad kostar det er per månad att INTE lösa detta nu - tid, pengar eller kunder?'
     ],
 
     insightCategories: {
@@ -78,11 +78,11 @@ Confidence når 100% när alla required categories är substantial och minst 5 i
     },
 
     insightExamples: [
-      'Problem: Backend kan inte hantera 10x trafik-ökning',
-      'Orsak: Monolitisk arkitektur, teknisk skuld från MVP',
-      'Utmaning: Migration under pågående tillväxt utan downtime',
-      'Försök: Optimering gav bara 2x, behöver omskrivning',
-      'Begränsning: 6 månaders runway, kan inte pausa utveckling'
+      'Problem: Kan inte leverera projekt i tid - missar deadlines',
+      'Orsak: Saknar senior kompetens som kan äga processer och leda',
+      'Utmaning: Måste växa samtidigt som vi levererar pågående åtaganden',
+      'Försök: Provat konsulter men kunskapen försvinner när de slutar',
+      'Begränsning: 6 månaders runway, kan inte pausa kundleveranser'
     ],
     
     transitionCriteria: `Gå vidare till Solution Design när du har täckt:
@@ -206,11 +206,11 @@ Känns det relevant för er situation?"
     },
 
     insightExamples: [
-      'Scenario: A) Senior + Junior (900k), B) Två Mids (1.2M), C) Konsult (1.5M)',
-      'Preferens: Väljer Senior + Junior för balans kostnad/kompetens',
+      'Scenario: A) Senior solo (800k), B) Mid-level + Junior duo (950k), C) Senior deltid (600k)',
+      'Preferens: Väljer Senior solo för snabb impact och budget',
       'Timeline: Start rekrytering Mars, onboarding Maj-Juni',
-      'Risk: Juniors kan ta 3-6 mån extra för produktivitet',
-      'Budget: Godkänt 900k från CFO, flex till 1M om rätt kandidat'
+      'Risk: Solo-anställning skapar single point of failure',
+      'Budget: Godkänt 800k från VD, flex till 900k om rätt kandidat'
     ],
     
     transitionCriteria: `Gå vidare till Action Plan när:
@@ -303,11 +303,11 @@ CRITICAL RULES:
 
     insightExamples: [
       'Milestone: Vecka 1-2 JD klar, Vecka 3-4 Sourcing, Vecka 5-8 Intervjuer, Vecka 9-12 Offer',
-      'Timeline: 12 veckor från start till onboarding (4 intervjuomgångar)',
-      'Nästa steg: 1) VD godkänner JD, 2) HR publicerar LinkedIn, 3) Brief rekryterare',
-      'Beroende: CFO-godkännande krävs innan erbjudande över 900k',
-      'Metrik: 50 ansökningar mål 1, 10 intervjuer, 3 finalister, 1 offer',
-      'Risk: Om inte hittat på 4v, öppna för konsult som backup'
+      'Timeline: 12 veckor från start till onboarding (3-4 intervjuomgångar)',
+      'Nästa steg: 1) VD godkänner JD, 2) Publicera annons, 3) Brief rekryterare',
+      'Beroende: Styrelsen måste godkänna budget över 900k',
+      'Metrik: 50 ansökningar vecka 1-2, 10 intervjuer, 3 finalister, 1 offer',
+      'Risk: Om inte hittat på 6v, överväga konsult som tillfällig lösning'
     ],
     
     transitionCriteria: `Session komplett när:

@@ -70,7 +70,7 @@ function HomeContent() {
   const [messages, setMessages] = useState<Message[]>([
     {
       role: 'assistant',
-      content: 'Välkommen till Recta! 👋\n\nJag hjälper dig att bygga en **strategisk rekryteringsplan**.\n\nLåt oss börja med att förstå er situation:\n\n- Hur många är ni i företaget?\n- Vilken roll letar ni efter?',
+      content: 'Välkommen till Recta! 👋\n\nJag hjälper er att bygga en **strategisk rekryteringsplan** - oavsett om ni är ett tech-företag, konsultbyrå, produktionsbolag eller annan verksamhet.\n\nLåt oss börja med att förstå er situation:\n\n**Berätta lite om ert företag:**\n- Hur många personer är ni?\n- Vilken bransch verkar ni inom?\n- Vilken roll söker ni?',
       timestamp: new Date().toISOString()
     }
   ]);
@@ -436,12 +436,18 @@ Vilken av dessa scenarios känns mest rätt för er situation?`,
         }
       }
 
-      const newDeliverables = deliverables;
+      // Kolla om minst en deliverable genererades framgångsrikt
+      const hasSuccessfulDeliverables = types.some(type => {
+        const status = generatingDeliverables[type as keyof typeof generatingDeliverables];
+        return status === 'complete';
+      });
 
-      setDeliverables(newDeliverables);
-      setCanvasState('deliverables');
-
-      console.log('[Generate] All deliverables generated successfully');
+      if (hasSuccessfulDeliverables) {
+        setCanvasState('deliverables');
+        console.log('[Generate] Switching to deliverables view');
+      } else {
+        console.log('[Generate] No deliverables generated successfully');
+      }
 
     } catch (error) {
       console.error('Error generating deliverables:', error);
