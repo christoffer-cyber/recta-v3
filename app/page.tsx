@@ -70,13 +70,15 @@ function HomeContent() {
   const [messages, setMessages] = useState<Message[]>([
     {
       role: 'assistant',
-      content: 'Välkommen till Recta! 👋\n\nJag hjälper er att bygga en **strategisk rekryteringsplan** - oavsett om ni är ett tech-företag, konsultbyrå, produktionsbolag eller annan verksamhet.\n\nLåt oss börja med att förstå er situation:\n\n**Berätta lite om ert företag:**\n- Hur många personer är ni?\n- Vilken bransch verkar ni inom?\n- Vilken roll söker ni?',
+      content: 'Välkommen till Recta! 👋\n\nJag hjälper er att bygga en **strategisk rekryteringsplan** - oavsett om ni är ett tech-företag, konsultbyrå, produktionsbolag eller annan verksamhet.\n\nLåt oss börja med att förstå er situation:\n\n**Berätta lite om er organisation** - hur många ni är och vad ni gör?',
       timestamp: new Date().toISOString()
     }
   ]);
   const [isLoading, setIsLoading] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
   const [isGeneratingScenarios, setIsGeneratingScenarios] = useState(false);
+  const [scenariosGenerated, setScenariosGenerated] = useState(false); // Prevent multiple triggers
+  const [actionPlanGenerated, setActionPlanGenerated] = useState(false); // Prevent multiple triggers
   
   // Canvas state
   const [canvasState, setCanvasState] = useState<CanvasState>('phase-progress');
@@ -191,21 +193,37 @@ function HomeContent() {
           'Skapar action plan'
         }`,
         completedPhases: [...(canvasData.phaseViz?.completedPhases || []), phaseConfig.name],
-        insights: [],  // ← Clear insights for fresh start
+        insights: canvasData.phaseViz?.insights || [],  // ← Preserve insights across phases
         confidence: 0,  // Reset confidence for new phase
         scenarios: undefined  // ← Clear old scenarios
       },
       isNewPhase: true // Mark as new phase
     });
 
+    // Reset generation flags when changing phases
+    setScenariosGenerated(false);
+    setActionPlanGenerated(false);
+
     // AUTO-GENERATE SCENARIOS FOR SOLUTION DESIGN
     if (nextConfig.id === 'solution-design') {
       await generateScenariosAutomatically();
+    }
+
+    // FIX 5: AUTO-GENERATE PRE-FILLED ACTION PLAN
+    if (nextConfig.id === 'action-plan') {
+      await generateActionPlanAutomatically();
     }
   };
 
   // ADD THIS NEW FUNCTION after handleAdvancePhase
   const generateScenariosAutomatically = async () => {
+    // Prevent multiple triggers
+    if (scenariosGenerated) {
+      console.log('[Auto-Scenarios] Already generated, skipping...');
+      return;
+    }
+    
+    setScenariosGenerated(true);
     setIsGeneratingScenarios(true);
     setShowProgress(true);
     
@@ -239,6 +257,8 @@ function HomeContent() {
       const data = await response.json();
       
       if (data.scenarios) {
+        console.log('[Auto-Scenarios] ✅ Received', data.scenarios.length, 'scenarios');
+        
         // Add scenarios to canvas
         setCanvasData(prev => ({
           ...prev,
@@ -276,6 +296,107 @@ Vilken av dessa scenarios känns mest rätt för er situation?`,
     } finally {
       setShowProgress(false);
       setIsGeneratingScenarios(false);
+    }
+  };
+
+  // FIX 5: AUTO-GENERATE PRE-FILLED ACTION PLAN
+  const generateActionPlanAutomatically = async () => {
+    // Prevent multiple triggers
+    if (actionPlanGenerated) {
+      console.log('[Action Plan] Already generated, skipping...');
+      return;
+    }
+    
+    setActionPlanGenerated(true);
+    setIsLoading(true);
+    
+    try {
+      console.log('[Action Plan] Auto-generating pre-filled action plan from insights...');
+      
+      // Collect ALL insights from ALL phases to build comprehensive action plan
+      const allMessages = messages.filter(m => m.role === 'assistant' || m.role === 'user');
+      
+      const response = await fetch('/api/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          messages: allMessages,
+          existingInsights: [],
+          currentConfidence: 0,
+          currentPhase: 'Action Plan',
+          isNewPhase: true,
+          generateActionPlan: true // Special flag for action plan generation
+        })
+      });
+
+      const data = await response.json();
+      
+      if (data.actionPlan) {
+        console.log('[Action Plan] ✅ Received pre-filled action plan');
+        
+        // Add AI message with pre-filled action plan
+        const actionPlanMessage: Message = {
+          role: 'assistant',
+          content: `Baserat på er situation har jag tagit fram en konkret handlingsplan:
+
+## 📅 Timeline
+${data.actionPlan.timeline}
+
+## 🎯 Key Milestones
+${data.actionPlan.milestones.map((m: string, i: number) => `${i + 1}. ${m}`).join('\n')}
+
+## ⚡ Nästa Steg
+${data.actionPlan.nextSteps.map((s: string, i: number) => `${i + 1}. ${s}`).join('\n')}
+
+## ⚠️ Risker & Beroenden
+${data.actionPlan.risks.map((r: string) => `- ${r}`).join('\n')}
+
+**Stämmer denna plan?** Vill du justera något eller kan vi gå vidare till att generera dina deliverables?`,
+          timestamp: new Date().toISOString()
+        };
+        
+        setMessages(prev => [...prev, actionPlanMessage]);
+        
+        // Extract insights from action plan and set confidence to 60%
+        const extractedInsights = [
+          `Timeline: ${data.actionPlan.timeline}`,
+          ...data.actionPlan.milestones.map((m: string) => `Milestone: ${m}`),
+          ...data.actionPlan.nextSteps.map((s: string) => `Nästa steg: ${s}`),
+          ...data.actionPlan.risks.map((r: string) => `Risk: ${r}`)
+        ];
+
+        setCanvasData(prev => ({
+          ...prev,
+          phaseViz: {
+            ...prev.phaseViz!,
+            insights: [...(prev.phaseViz?.insights || []), ...extractedInsights],
+            confidence: 60 // Pre-filled plan = needs validation
+          }
+        }));
+      } else {
+        // Fallback: Ask user to build plan from scratch
+        const fallbackMessage: Message = {
+          role: 'assistant',
+          content: 'Låt oss skapa en konkret handlingsplan. Vilken timeline ser ni framför er för denna rekrytering?',
+          timestamp: new Date().toISOString()
+        };
+        
+        setMessages(prev => [...prev, fallbackMessage]);
+      }
+
+    } catch (error) {
+      console.error('[Action Plan] Error generating action plan:', error);
+      
+      // Fallback message
+      const fallbackMessage: Message = {
+        role: 'assistant',
+        content: 'Låt oss bygga en handlingsplan tillsammans. Hur snabbt behöver ni få denna person på plats?',
+        timestamp: new Date().toISOString()
+      };
+      
+      setMessages(prev => [...prev, fallbackMessage]);
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -319,13 +440,14 @@ Vilken av dessa scenarios känns mest rätt för er situation?`,
       const oldConfidence = canvasData.phaseViz?.confidence || 0;
       const newConfidence = data.confidence ?? oldConfidence;
       
-          // Update canvas state
+          // Update canvas state (preserve scenarios!)
           setCanvasData(prev => ({
             ...prev,
             phaseViz: {
               ...prev.phaseViz!,
               insights: deduplicatedInsights,
-              confidence: newConfidence
+              confidence: newConfidence,
+              scenarios: prev.phaseViz?.scenarios // ← PRESERVE scenarios
             },
             isNewPhase: false // Clear after first message
           }));
@@ -350,6 +472,15 @@ Vilken av dessa scenarios känns mest rätt för er situation?`,
           };
           setMessages(prev => [...prev, wrapUpMessage]);
         }, 800);
+      }
+
+      // FIX 4: AUTO-TRIGGER SCENARIO GENERATION AT 85%+ IN SOLUTION DESIGN
+      if (data.autoGenerateScenarios && !isGeneratingScenarios && !scenariosGenerated) {
+        console.log('[Auto-Scenarios] Triggering automatic scenario generation');
+        // Trigger async (don't await to keep chat flowing)
+        generateScenariosAutomatically().catch(err => {
+          console.error('[Auto-Scenarios] Error:', err);
+        });
       }
       
     } catch (error) {
@@ -383,6 +514,10 @@ Vilken av dessa scenarios känns mest rätt för er situation?`,
 
       console.log('[Generate] Starting sequential deliverable generation...');
 
+      // Track success locally to avoid React state closure issue
+      const successfulTypes: string[] = [];
+      const failedTypes: string[] = [];
+
       // Generate SEQUENTIALLY to show progress
       for (const type of types) {
         // Set to generating
@@ -402,18 +537,34 @@ Vilken av dessa scenarios känns mest rätt för er situation?`,
           });
 
           if (!response.ok) {
-            throw new Error(`Failed to generate ${type}`);
+            console.error(`❌ Failed to generate ${type} (${response.status}), skipping...`);
+            setGeneratingDeliverables(prev => ({
+              ...prev,
+              [type]: 'pending'
+            }));
+            failedTypes.push(type);
+            continue; // Skip to next deliverable
           }
 
           const data = await response.json();
           
-          // Update deliverables state
+          if (data.error) {
+            console.error(`❌ API error for ${type}:`, data.error);
+            setGeneratingDeliverables(prev => ({
+              ...prev,
+              [type]: 'pending'
+            }));
+            failedTypes.push(type);
+            continue;
+          }
+          
+          // Update deliverables state with correct field name
           setDeliverables(prev => {
             const newDeliverables = { ...prev };
-            if (type === 'job_description') newDeliverables.jobDescription = data.deliverable;
-            else if (type === 'compensation_analysis') newDeliverables.compensation = data.deliverable;
-            else if (type === 'interview_questions') newDeliverables.interviewQuestions = data.deliverable;
-            else if (type === 'success_plan') newDeliverables.successPlan = data.deliverable;
+            if (type === 'job_description') newDeliverables.jobDescription = data.data;
+            else if (type === 'compensation_analysis') newDeliverables.compensation = data.data;
+            else if (type === 'interview_questions') newDeliverables.interviewQuestions = data.data;
+            else if (type === 'success_plan') newDeliverables.successPlan = data.data;
             return newDeliverables;
           });
 
@@ -423,34 +574,44 @@ Vilken av dessa scenarios känns mest rätt för er situation?`,
             [type]: 'complete'
           }));
 
-          console.log(`[Generate] ✓ ${type} complete`);
+          // Track success locally
+          successfulTypes.push(type);
+          console.log(`✅ Generated ${type}`);
 
         } catch (error) {
-          console.error(`[Generate] Error generating ${type}:`, error);
+          console.error(`❌ Error generating ${type}:`, error);
           
-          // Mark as pending (failed)
+          // Mark as pending (failed) but continue
           setGeneratingDeliverables(prev => ({
             ...prev,
             [type]: 'pending'
           }));
+          failedTypes.push(type);
+          // Don't throw - continue to next deliverable
         }
       }
 
-      // Kolla om minst en deliverable genererades framgångsrikt
-      const hasSuccessfulDeliverables = types.some(type => {
-        const status = generatingDeliverables[type as keyof typeof generatingDeliverables];
-        return status === 'complete';
-      });
+      console.log('[Generate] ✅ All deliverables processed');
+      console.log(`[Generate] Successful: ${successfulTypes.join(', ')}`);
+      console.log(`[Generate] Failed: ${failedTypes.join(', ')}`);
+      
+      // Use local tracking instead of reading from state
+      const successCount = successfulTypes.length;
+      
+      console.log(`[Generate] Summary: ${successCount}/${types.length} deliverables generated successfully`);
 
-      if (hasSuccessfulDeliverables) {
+      if (successCount > 0) {
         setCanvasState('deliverables');
         console.log('[Generate] Switching to deliverables view');
       } else {
-        console.log('[Generate] No deliverables generated successfully');
+        console.log('[Generate] ❌ No deliverables generated successfully');
+        alert('Kunde inte generera några deliverables. Försök igen eller kontakta support.');
       }
+      
+      setShowProgress(false);
 
     } catch (error) {
-      console.error('Error generating deliverables:', error);
+      console.error('[Generate] Fatal error:', error);
       alert('Ett fel uppstod när deliverables skulle genereras');
     } finally {
       setIsGenerating(false);
@@ -774,7 +935,7 @@ Vilken av dessa scenarios känns mest rätt för er situation?`,
           isGeneratingScenarios={isGeneratingScenarios}
         />
       }
-      canvas={<Canvas state={canvasState} data={canvasData} deliverables={deliverables} researchState={undefined} showProgress={showProgress} generatingDeliverables={generatingDeliverables} conversationId={conversationId ?? undefined} />}
+      canvas={<Canvas state={canvasState} data={canvasData} deliverables={deliverables} researchState={undefined} showProgress={showProgress} generatingDeliverables={generatingDeliverables} isGeneratingScenarios={isGeneratingScenarios} conversationId={conversationId ?? undefined} />}
       insights={
         <InsightsSidebar 
           phase={currentPhase}

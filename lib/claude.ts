@@ -9,14 +9,19 @@ export async function callClaude(
   messages: Message[],
   systemPrompt: string
 ): Promise<string> {
+  // Filter out empty messages to avoid Claude API errors
+  const validMessages = messages
+    .filter(m => m.content && m.content.trim().length > 0)
+    .map(m => ({
+      role: m.role,
+      content: m.content
+    }));
+
   const response = await anthropic.messages.create({
     model: 'claude-sonnet-4-20250514',
     max_tokens: 2000,
     system: systemPrompt,
-    messages: messages.map(m => ({
-      role: m.role,
-      content: m.content
-    }))
+    messages: validMessages
   });
 
   const content = response.content[0];

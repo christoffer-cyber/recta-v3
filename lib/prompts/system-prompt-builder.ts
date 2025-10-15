@@ -19,7 +19,7 @@ export function buildSystemPrompt(options: SystemPromptOptions): string {
   const basePrompt = buildBasePrompt(config);
   const contextSection = buildContextSection(options.insights, options.confidence, config, options.isNewPhase);
   const researchSection = options.researchContext || '';
-  const behaviorGuidelines = buildBehaviorGuidelines();
+  const behaviorGuidelines = buildBehaviorGuidelines(options.confidence);
   const insightExtraction = buildInsightExtraction(config);
 
   return `${basePrompt}
@@ -124,12 +124,30 @@ function groupInsightsByCategory(insights: string[]): Record<string, string[]> {
   return grouped;
 }
 
-function buildBehaviorGuidelines(): string {
+function buildBehaviorGuidelines(confidence: number): string {
+  const isHighConfidence = confidence >= 85;
+  
   return `## KONVERSATIONSSTIL:
 - Var vänlig och professionell
-- Ställ EN fråga åt gången
+- ${isHighConfidence ? '⚠️ WRAP-UP MODE: Sammanfatta kort vad vi lärt, fråga "Redo att gå vidare?"' : 'Ställ EN fråga åt gången'}
 - Lyssna på svaren och bygg vidare
 - Använd naturlig svenska
+
+## CONFIDENCE-DRIVEN BEHAVIOR:
+Current confidence: ${confidence}%
+
+${isHighConfidence ? `
+🔒 HIGH CONFIDENCE MODE (${confidence}% ≥ 85%)
+- NO MORE QUESTIONS
+- Sammanfatta key insights
+- Säg "Vi har en solid förståelse nu"
+- Fråga: "Redo att gå vidare till [next phase]?"
+` : `
+📊 GATHERING MODE (${confidence}% < 85%)
+- Continue asking questions
+- Extract multiple insights per answer
+- Build toward 85%+ confidence
+`}
 
 ## 🚨 ABSOLUT KRITISKT - CONFIDENCE THRESHOLD REGLER:
 
@@ -211,9 +229,9 @@ Läs detta NOGGRANT varje gång:
 }
 
 function buildInsightExtraction(config: PhasePromptConfig): string {
-  return `## INSIGHT-EXTRAKTIONSFORMAT:
+  return `## MULTI-INSIGHT EXTRAKTIONSFORMAT:
 
-**KRITISKT: Använd kategori-prefix för att confidence-systemet ska fungera!**
+**KRITISKT: Extrahera FLERA insights per svar för snabbare framsteg!**
 
 Required kategorier för denna fas:
 ${config.insightCategories.required.map(c => `- ${c}:`).join('\n')}
@@ -221,12 +239,24 @@ ${config.insightCategories.required.map(c => `- ${c}:`).join('\n')}
 Valfria kategorier (bonus):
 ${config.insightCategories.optional.map(c => `- ${c}:`).join('\n')}
 
-**Format-regler:**
-1. Börja med kategorinamn följt av kolon: "Företag:", "Problem:", etc
-2. Var specifik och substantial (min 15-20 tecken faktiskt innehåll)
-3. Använd inte "unknown", "ej specificerat", eller tomma värden
-4. Uppdatera befintliga insights om ny info kompletterar dem
-5. Extrahera bara NYA insights som inte redan finns i kontext
+**MULTI-INSIGHT REGLER:**
+1. **Extrahera 2-4 insights per användarsvar** (inte bara 1)
+2. **Gör inferenser:** Om användaren säger "Vi är 25 personer i Stockholm" → extrahera:
+   - Företag: 25 personer
+   - Företag: Stockholm (location)
+   - Företag: Sannolikt 20-50 MSEK funding (inference)
+3. **Börja med kategorinamn följt av kolon:** "Företag:", "Problem:", etc
+4. **Var specifik och substantial** (min 15-20 tecken faktiskt innehåll)
+5. **Använd inte "unknown", "ej specificerat", eller tomma värden**
+6. **Extrahera bara NYA insights som inte redan finns i kontext**
+
+**Multi-insight exempel:**
+Användaren: "Vi är ett 25-person B2B SaaS-företag i Stockholm som söker en CTO"
+Extrahera:
+- Företag: 25 personer, B2B SaaS, Stockholm
+- Roll: CTO
+- Företag: Sannolikt Series A-fas (inference från storlek)
+- Team: Saknar teknisk ledning (inference från CTO-behov)
 
 **Bra exempel:**
 ${config.insightExamples.map(e => `✓ ${e}`).join('\n')}
@@ -241,7 +271,8 @@ Lägg till insights i ditt svar med:
 ###INSIGHTS###
 - [Kategori: specifikt substantial innehåll]
 - [Kategori: specifikt substantial innehåll]
+- [Kategori: specifikt substantial innehåll]
 
-Kom ihåg: Kvalitet > Kvantitet. Bättre 2 substantial insights än 5 vaga.`;
+Kom ihåg: Multi-insight > Single insight. Extrahera allt du kan från varje svar!`;
 }
 

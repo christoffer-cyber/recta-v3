@@ -7,6 +7,7 @@ import {
   InterviewQuestions,
   SuccessPlan
 } from '@/lib/deliverable-schemas';
+import { generateMarkdown, downloadMarkdown, downloadJSON, downloadPDF } from '@/lib/export-utils';
 
 interface DeliverablesViewProps {
   jobDescription?: JobDescription;
@@ -31,10 +32,39 @@ export function DeliverablesView({
     }).format(amount);
   };
 
+  const handleExportMarkdown = () => {
+    const markdown = generateMarkdown({
+      jobDescription,
+      compensation,
+      interviewQuestions,
+      successPlan
+    });
+    downloadMarkdown(markdown);
+  };
+
+  const handleExportJSON = () => {
+    downloadJSON({
+      jobDescription,
+      compensation,
+      interviewQuestions,
+      successPlan
+    });
+  };
+
+  const handleExportPDF = async () => {
+    await downloadPDF({
+      jobDescription,
+      compensation,
+      interviewQuestions,
+      successPlan
+    });
+  };
+
   return (
     <div className="h-full flex flex-col bg-white">
-      {/* Tab Navigation */}
-      <div className="flex border-b border-gray-200 bg-gray-50 px-6">
+      {/* Tab Navigation + Export Buttons */}
+      <div className="flex items-center justify-between border-b border-gray-200 bg-gray-50 px-6">
+        <div className="flex">
         <button
           onClick={() => setActiveTab('jd')}
           className={`px-4 py-3 text-sm font-medium border-b-2 transition-colors ${
@@ -75,6 +105,29 @@ export function DeliverablesView({
         >
           📅 90-Day Plan
         </button>
+        </div>
+        
+        {/* Export Buttons */}
+        <div className="flex gap-2">
+          <button
+            onClick={handleExportMarkdown}
+            className="px-3 py-1.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded hover:bg-gray-50 transition-colors"
+          >
+            📄 Markdown
+          </button>
+          <button
+            onClick={handleExportJSON}
+            className="px-3 py-1.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded hover:bg-gray-50 transition-colors"
+          >
+            💾 JSON
+          </button>
+          <button
+            onClick={handleExportPDF}
+            className="px-3 py-1.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded hover:bg-gray-50 transition-colors"
+          >
+            📑 PDF
+          </button>
+        </div>
       </div>
 
       {/* Content Area */}

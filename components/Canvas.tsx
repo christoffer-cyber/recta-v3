@@ -11,6 +11,7 @@ import { DeliverableProgressCard } from './DeliverableProgressCard';
 import type { CanvasState, JobDescriptionPreview, PhaseVisualization as PhaseViz } from '@/lib/canvas-types';
 import type { JobDescription, CompensationAnalysis, InterviewQuestions, SuccessPlan } from '@/lib/deliverable-schemas';
 import { PHASE_REQUIREMENTS } from '@/lib/confidence/config';
+import { createCanvasStateMachine, getActiveCanvasState, shouldShowProgressBanner } from '@/lib/canvas-state-machine';
 
 interface CanvasProps {
   state: CanvasState;
@@ -42,15 +43,79 @@ interface CanvasProps {
     interview_questions: 'pending' | 'generating' | 'complete';
     success_plan: 'pending' | 'generating' | 'complete';
   };
+  isGeneratingScenarios?: boolean;
   conversationId?: number;
 }
 
-export function Canvas({ state, data, deliverables, researchState, showProgress, generatingDeliverables, conversationId }: CanvasProps) {
+export function Canvas({ state, data, deliverables, researchState, showProgress, generatingDeliverables, isGeneratingScenarios, conversationId }: CanvasProps) {
+  // FIX 6: Canvas State Machine - Priority-based rendering
+  const isGenerating = Boolean(showProgress && generatingDeliverables && Object.values(generatingDeliverables).some(s => s !== 'pending'));
+  const isResearching = researchState?.isActive ?? false;
+  
+  const stateMachine = createCanvasStateMachine(
+    isGenerating,
+    isResearching,
+    data?.phaseViz?.scenarios,
+    data?.phaseViz?.currentPhase || '',
+    data?.phaseViz?.confidence || 0,
+    data?.phaseViz?.insights || [],
+    isGeneratingScenarios ?? false
+  );
+  
+  const activeState = state === 'deliverables' || state === 'jd-preview' || state === 'empty' 
+    ? state  // Respect explicit canvas states
+    : getActiveCanvasState(stateMachine);  // Use state machine for phase-progress
+  
+  const showFixedBanner = shouldShowProgressBanner(stateMachine);
+
   return (
-    <div className="h-full bg-gray-50 overflow-y-auto" style={{ minHeight: 0 }}>
-      <div className="p-6">
+    <div className="h-full bg-gray-50 flex flex-col overflow-hidden">
+      {/* FIX 6: Fixed Top Progress Banner */}
+      {showFixedBanner && generatingDeliverables && (
+        <div className="bg-white border-b border-gray-200 p-4 flex-shrink-0 shadow-sm">
+          <div className="max-w-4xl mx-auto">
+            <h3 className="text-sm font-semibold mb-3 text-gray-900 flex items-center gap-2">
+              <span>📦</span>
+              <span>Genererar Dokument</span>
+            </h3>
+            
+            <div className="grid grid-cols-2 gap-3">
+              <DeliverableProgressCard
+                title="job_description"
+                status={generatingDeliverables.job_description}
+                content={deliverables?.jobDescription}
+                conversationId={conversationId}
+              />
+              
+              <DeliverableProgressCard
+                title="compensation_analysis"
+                status={generatingDeliverables.compensation_analysis}
+                content={deliverables?.compensation}
+                conversationId={conversationId}
+              />
+              
+              <DeliverableProgressCard
+                title="interview_questions"
+                status={generatingDeliverables.interview_questions}
+                content={deliverables?.interviewQuestions}
+                conversationId={conversationId}
+              />
+              
+              <DeliverableProgressCard
+                title="success_plan"
+                status={generatingDeliverables.success_plan}
+                content={deliverables?.successPlan}
+                conversationId={conversationId}
+              />
+            </div>
+          </div>
+        </div>
+      )}
+      
+      {/* Main Canvas Content */}
+      <div className="flex-1 overflow-y-auto p-6" style={{ minHeight: 0 }}>
         <AnimatePresence mode="wait">
-        {state === 'empty' && (
+        {activeState === 'empty' && (
           <motion.div
             key="empty"
             initial={{ opacity: 0 }}
@@ -78,7 +143,49 @@ export function Canvas({ state, data, deliverables, researchState, showProgress,
           </motion.div>
         )}
 
-        {state === 'phase-progress' && data?.phaseViz && (() => {
+        {activeState === 'generating-scenarios' && (
+          <motion.div
+            key="generating-scenarios"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.3 }}
+            className="h-full flex items-center justify-center"
+          >
+            <div className="text-center max-w-md">
+              <motion.div 
+                className="w-20 h-20 bg-blue-100 rounded-2xl flex items-center justify-center mx-auto mb-4"
+                animate={{ rotate: 360 }}
+                transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
+              >
+                <svg className="w-10 h-10 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
+                </svg>
+              </motion.div>
+              <h2 className="text-xl font-semibold text-gray-900 mb-2">Genererar lösningsscenarier</h2>
+              <p className="text-gray-600 text-sm">
+                AI:n analyserar er situation och skapar 3 olika lösningsvägar...
+              </p>
+            </div>
+          </motion.div>
+        )}
+
+        {activeState === 'scenarios' && data?.phaseViz?.scenarios && (
+          <motion.div
+            key="scenarios"
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -20 }}
+            transition={{ duration: 0.4 }}
+            className="h-full overflow-y-auto p-6"
+          >
+            <div className="max-w-4xl mx-auto">
+              <ScenarioComparison scenarios={data.phaseViz.scenarios} />
+            </div>
+          </motion.div>
+        )}
+
+        {activeState === 'phase-progress' && data?.phaseViz && (() => {
           const phaseId = data.phaseViz.currentPhase.split(' - ')[0].trim();
           const requirements = PHASE_REQUIREMENTS[phaseId];
 
@@ -129,51 +236,6 @@ export function Canvas({ state, data, deliverables, researchState, showProgress,
                 <ScenarioComparison scenarios={data.phaseViz.scenarios} />
               )}
 
-              {/* Deliverables Generation Progress */}
-              {generatingDeliverables && (
-                generatingDeliverables.job_description !== 'pending' ||
-                generatingDeliverables.compensation_analysis !== 'pending' ||
-                generatingDeliverables.interview_questions !== 'pending' ||
-                generatingDeliverables.success_plan !== 'pending'
-              ) && (
-                <div className="mb-6">
-                  <h3 className="text-lg font-semibold mb-4 text-gray-900 flex items-center gap-2">
-                    <span>📦</span>
-                    <span>Genererar Dokument</span>
-                  </h3>
-                  
-                  <div className="space-y-3">
-                    <DeliverableProgressCard
-                      title="job_description"
-                      status={generatingDeliverables.job_description}
-                      content={deliverables?.jobDescription}
-                      conversationId={conversationId}
-                    />
-                    
-                    <DeliverableProgressCard
-                      title="compensation_analysis"
-                      status={generatingDeliverables.compensation_analysis}
-                      content={deliverables?.compensation}
-                      conversationId={conversationId}
-                    />
-                    
-                    <DeliverableProgressCard
-                      title="interview_questions"
-                      status={generatingDeliverables.interview_questions}
-                      content={deliverables?.interviewQuestions}
-                      conversationId={conversationId}
-                    />
-                    
-                    <DeliverableProgressCard
-                      title="success_plan"
-                      status={generatingDeliverables.success_plan}
-                      content={deliverables?.successPlan}
-                      conversationId={conversationId}
-                    />
-                  </div>
-                </div>
-              )}
-
               {/* Research Animation (conditional) */}
               {researchState && (
                 <ResearchAnimation
@@ -189,7 +251,7 @@ export function Canvas({ state, data, deliverables, researchState, showProgress,
           );
         })()}
 
-        {state === 'jd-preview' && data?.jdPreview && (
+        {activeState === 'jd-preview' && data?.jdPreview && (
           <motion.div
             key="jd"
             initial={{ opacity: 0, x: 20 }}
@@ -201,7 +263,7 @@ export function Canvas({ state, data, deliverables, researchState, showProgress,
           </motion.div>
         )}
 
-        {state === 'deliverables' && deliverables && (
+        {activeState === 'deliverables' && deliverables && (
           <motion.div
             key="deliverables"
             initial={{ opacity: 0, x: 20 }}
@@ -210,7 +272,12 @@ export function Canvas({ state, data, deliverables, researchState, showProgress,
             transition={{ type: 'spring', stiffness: 300, damping: 30 }}
             className="h-full"
           >
-            <DeliverablesView {...deliverables} />
+            <DeliverablesView
+              jobDescription={deliverables.jobDescription}
+              compensation={deliverables.compensation}
+              interviewQuestions={deliverables.interviewQuestions}
+              successPlan={deliverables.successPlan}
+            />
           </motion.div>
         )}
         </AnimatePresence>

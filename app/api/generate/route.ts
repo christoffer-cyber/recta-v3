@@ -33,12 +33,14 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Call Claude with tool_use
-    const response = await anthropic.messages.create({
+    const toolName = `generate_${type}`;
+    
+    // First attempt - Call Claude with tool_use
+    let response = await anthropic.messages.create({
       model: 'claude-sonnet-4-20250514',
       max_tokens: 4096,
       tools: [{
-        name: `generate_${type}`,
+        name: toolName,
         description: getToolDescription(type),
         input_schema: schema
       }],
@@ -49,18 +51,46 @@ export async function POST(request: NextRequest) {
     });
 
     // Extract tool_use response
-    const toolUse = response.content.find(block => block.type === 'tool_use');
+    let toolUse = response.content.find(block => block.type === 'tool_use');
     
+    // RETRY if no tool use (especially for job_description)
     if (!toolUse || toolUse.type !== 'tool_use') {
-      console.error('[Generate] No tool use in response');
-      return NextResponse.json({ error: 'Failed to generate' }, { status: 500 });
+      console.log(`[Generate] ⚠️  No tool use for ${type}, retrying with explicit instruction...`);
+      
+      const retryPrompt = `You MUST use the ${toolName} tool to generate the output.
+
+Context (first 800 chars):
+${context.substring(0, 800)}
+
+CRITICAL: Call the ${toolName} tool NOW. Do NOT respond with text. Use the tool with proper JSON structure matching all required fields.`;
+
+      response = await anthropic.messages.create({
+        model: 'claude-sonnet-4-20250514',
+        max_tokens: 4096,
+        tools: [{
+          name: toolName,
+          description: getToolDescription(type),
+          input_schema: schema
+        }],
+        messages: [{
+          role: 'user',
+          content: retryPrompt
+        }]
+      });
+
+      toolUse = response.content.find(block => block.type === 'tool_use');
+      
+      if (!toolUse || toolUse.type !== 'tool_use') {
+        console.error(`[Generate] ❌ Still no tool use for ${type} after retry`);
+        return NextResponse.json({ error: 'No tool use in response' }, { status: 500 });
+      }
     }
 
-    console.log(`[Generate] Successfully created ${type}`);
+    console.log(`[Generate] ✅ Successfully created ${type}`);
 
     return NextResponse.json({
       type,
-      deliverable: toolUse.input
+      data: toolUse.input  // Changed from 'deliverable' to 'data'
     });
 
   } catch (error: unknown) {

@@ -15,6 +15,7 @@ export async function POST(request: NextRequest) {
         const currentPhase: string = body.currentPhase || 'Context';
         const isNewPhase: boolean = body.isNewPhase || false;
         const generateScenarios: boolean = body.generateScenarios || false;
+        const generateActionPlan: boolean = body.generateActionPlan || false;
 
     // SPECIAL MODE: Generate Scenarios
     if (generateScenarios) {
@@ -49,6 +50,39 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    // SPECIAL MODE: Generate Action Plan
+    if (generateActionPlan) {
+      console.log('[Chat API] 📋 ACTION PLAN GENERATION MODE');
+      
+      try {
+        const actionPlanPrompt = buildActionPlanPrompt(messages);
+        
+        const actionPlanResponse = await callClaude(
+          [{ role: 'user', content: actionPlanPrompt, timestamp: new Date().toISOString() }],
+          'You are an expert project manager creating an executable action plan.'
+        );
+
+        // Parse action plan from response
+        const actionPlan = parseActionPlan(actionPlanResponse);
+        
+        console.log('[Chat API] Generated action plan');
+        
+        return NextResponse.json({
+          message: 'Action plan generated',
+          actionPlan: actionPlan,
+          insights: existingInsights,
+          confidence: currentConfidence
+        });
+        
+      } catch (error) {
+        console.error('[Chat API] Action plan generation error:', error);
+        return NextResponse.json(
+          { error: 'Failed to generate action plan' },
+          { status: 500 }
+        );
+      }
+    }
+
     if (messages.length === 0) {
       return NextResponse.json(
         { error: 'No messages provided' },
@@ -56,11 +90,16 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // FIX 1: TWO-PHASE CONFIDENCE CALCULATION
+    // Phase 1: Pre-calculate confidence from existing insights BEFORE Claude call
+    const preCalculatedConfidence = calculateConfidence(currentPhase, existingInsights);
+    
     console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
     console.log('[Chat API] Phase:', currentPhase);
     console.log('[Chat API] IsNewPhase:', isNewPhase);
-    console.log('[Chat API] Confidence:', currentConfidence);
+    console.log('[Chat API] Pre-calculated Confidence:', preCalculatedConfidence.confidence);
     console.log('[Chat API] Total Insights:', existingInsights.length);
+    console.log('[Chat API] Confidence Breakdown:', preCalculatedConfidence.breakdown);
     console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
 
     // Research trigger - generic and intelligent
@@ -68,7 +107,7 @@ export async function POST(request: NextRequest) {
 
     const conversationState = {
       currentPhase: currentPhase as 'Context' | 'Problem Discovery' | 'Solution Design' | 'Action Plan',
-      confidence: currentConfidence,
+      confidence: preCalculatedConfidence.confidence,
       insights: existingInsights
     };
 
@@ -91,14 +130,14 @@ export async function POST(request: NextRequest) {
       }
     }
 
-        // Build system prompt with research context
-        const systemPrompt = buildPrompt({
-          phase: currentPhase,
-          insights: existingInsights,
-          confidence: currentConfidence,
-          researchContext: researchContext,
-          isNewPhase: isNewPhase
-        });
+    // Phase 2: Build system prompt with PRE-CALCULATED confidence for real-time AI awareness
+    const systemPrompt = buildPrompt({
+      phase: currentPhase,
+      insights: existingInsights,
+      confidence: preCalculatedConfidence.confidence,
+      researchContext: researchContext,
+      isNewPhase: isNewPhase
+    });
 
         // Log first 500 chars of system prompt for debugging
         console.log('[Chat API] System Prompt Preview:', systemPrompt.substring(0, 500));
@@ -109,24 +148,38 @@ export async function POST(request: NextRequest) {
     // Split response into message and insights
     const [message, insightSection] = fullResponse.split('###INSIGHTS###');
     
-    const insights = insightSection 
+    const rawInsights = insightSection 
       ? insightSection
           .split('\n')
           .filter(line => line.trim().startsWith('-'))
           .map(line => line.trim().substring(2)) // Remove "- "
       : [];
 
-    // Calculate confidence based on all insights (existing + new)
-    const allInsights = [...existingInsights, ...insights];
-    const confidenceResult = calculateConfidence(currentPhase, allInsights);
+    // FIX 2: POST-PROCESSING VALIDATION
+    const insights = validateAndCleanInsights(rawInsights, existingInsights);
 
-    console.log('[Chat API] Confidence calculated:', confidenceResult);
+    // Calculate FINAL confidence based on all insights (existing + new)
+    const allInsights = [...existingInsights, ...insights];
+    const finalConfidenceResult = calculateConfidence(currentPhase, allInsights);
+
+    console.log('[Chat API] Final confidence calculated:', finalConfidenceResult);
+
+    // FIX 4: AUTO-TRIGGER SCENARIO GENERATION AT 85%+ IN SOLUTION DESIGN
+    const shouldAutoGenerateScenarios = 
+      currentPhase === 'Solution Design' && 
+      finalConfidenceResult.confidence >= 85 &&
+      !generateScenarios; // Don't trigger if already generating scenarios
+
+    if (shouldAutoGenerateScenarios) {
+      console.log('[Chat API] 🎯 Auto-triggering scenario generation at', finalConfidenceResult.confidence, '%');
+    }
 
     return NextResponse.json({ 
       message: message.trim(),
       insights: insights.length > 0 ? insights : undefined,
-      confidence: confidenceResult.confidence,
-      confidenceBreakdown: confidenceResult.breakdown
+      confidence: finalConfidenceResult.confidence,
+      confidenceBreakdown: finalConfidenceResult.breakdown,
+      autoGenerateScenarios: shouldAutoGenerateScenarios
     });
   } catch (error: unknown) {
     console.error('Chat API error:', error);
@@ -298,5 +351,134 @@ function parseScenarios(response: string): Scenario[] {
         impact: 'medium'
       }
     ];
+  }
+}
+
+// FIX 2: Post-processing validation for multi-insight extraction
+function validateAndCleanInsights(rawInsights: string[], existingInsights: string[]): string[] {
+  const validInsights: string[] = [];
+  
+  rawInsights.forEach(insight => {
+    // Skip if empty or too short
+    if (!insight || insight.length < 10) return;
+    
+    // Skip if contains invalid keywords
+    const invalidKeywords = ['unknown', 'ej specificerat', 'inte angivet', 'okänd', 'tbd', 'cirka', 'okej'];
+    if (invalidKeywords.some(keyword => insight.toLowerCase().includes(keyword))) {
+      console.log('[Validation] Skipping invalid insight:', insight);
+      return;
+    }
+    
+    // Check if it's a duplicate of existing insights
+    const isDuplicate = existingInsights.some(existing => {
+      const similarity = calculateSimilarity(insight, existing);
+      return similarity > 0.8; // 80% similarity threshold
+    });
+    
+    if (isDuplicate) {
+      console.log('[Validation] Skipping duplicate insight:', insight);
+      return;
+    }
+    
+    // Validate category prefix
+    const [category] = insight.split(':');
+    if (!category || category.length < 2) {
+      console.log('[Validation] Missing category prefix:', insight);
+      return;
+    }
+    
+    validInsights.push(insight);
+  });
+  
+  console.log('[Validation] Raw insights:', rawInsights.length, '→ Valid insights:', validInsights.length);
+  return validInsights;
+}
+
+// Helper function to calculate text similarity
+function calculateSimilarity(text1: string, text2: string): number {
+  const words1 = text1.toLowerCase().split(/\s+/);
+  const words2 = text2.toLowerCase().split(/\s+/);
+  
+  const intersection = words1.filter(word => words2.includes(word));
+  const union = [...new Set([...words1, ...words2])];
+  
+  return intersection.length / union.length;
+}
+
+// Helper: Build prompt for action plan generation
+function buildActionPlanPrompt(messages: Message[]): string {
+  const conversationContext = messages
+    .filter(m => m.content && m.content.trim().length > 0)
+    .map(m => `${m.role}: ${m.content}`)
+    .join('\n\n');
+
+  return `You are creating a concrete action plan based on the full conversation.
+
+CONVERSATION CONTEXT:
+${conversationContext}
+
+TASK: Generate a detailed, executable action plan as JSON with the following structure:
+
+\`\`\`json
+{
+  "timeline": "Overall timeline (e.g., '8-12 weeks from JD approval to first day')",
+  "milestones": [
+    "Week 1-2: Finalize and publish JD",
+    "Week 3-4: Sourcing and screening (target 50+ applications)",
+    "Week 5-6: First round interviews (10-15 candidates)",
+    "Week 7-8: Final interviews and offer (3-5 finalists)"
+  ],
+  "nextSteps": [
+    "VD godkänner final JD (deadline: Friday)",
+    "CTO förbereder teknisk intervju-setup",
+    "Publicera på LinkedIn, Our Company site, relevant Slack-communities"
+  ],
+  "risks": [
+    "Senior kandidater har ofta 3 månaders uppsägningstid",
+    "Om ingen senior på 6v, aktivera konsult-backup plan",
+    "Budget-flex till 900k måste godkännas av VD innan erbjudande"
+  ]
+}
+\`\`\`
+
+Base the plan on THEIR specific situation, constraints, and timeline from the conversation.
+Output ONLY valid JSON, no other text.`;
+}
+
+// Helper: Parse action plan from Claude response
+function parseActionPlan(response: string): any {
+  try {
+    const cleaned = response.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
+    const parsed = JSON.parse(cleaned);
+    
+    if (parsed.timeline && parsed.milestones && parsed.nextSteps && parsed.risks) {
+      return parsed;
+    }
+    
+    throw new Error('Invalid action plan format');
+    
+  } catch (error) {
+    console.error('[Parse Action Plan] Error:', error);
+    console.error('[Parse Action Plan] Response was:', response);
+    
+    // Return fallback action plan
+    return {
+      timeline: '8-12 veckor från JD-godkännande till första dagen',
+      milestones: [
+        'Vecka 1-2: Finalisera och publicera JD',
+        'Vecka 3-4: Sourcing och screening',
+        'Vecka 5-6: Första intervjuomgången',
+        'Vecka 7-8: Finalintervjuer och erbjudande'
+      ],
+      nextSteps: [
+        'VD godkänner JD',
+        'CTO förbereder teknisk intervju',
+        'Publicera annons på LinkedIn och relevanta kanaler'
+      ],
+      risks: [
+        'Uppsägningstider kan förlänga processen',
+        'Budget-flex måste godkännas innan erbjudande'
+      ]
+    };
   }
 }

@@ -7,6 +7,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
+    "type-check": "tsc --noEmit",
+    "test": "npm run type-check && npm run lint",
     "init-db": "tsx scripts/init-db.ts"
   },
   "dependencies": {

@@ -68,8 +68,10 @@ export const authOptions: NextAuthOptions = {
     },
     async session({ session, token }) {
       if (session.user) {
-        session.user.id = token.id as string;
-        console.log('💾 Session callback - setting session.user.id:', token.id);
+        // FIX: Convert to number here to avoid NaN in API routes
+        const userId = typeof token.id === 'string' ? parseInt(token.id, 10) : token.id;
+        session.user.id = userId as any; // Type assertion needed due to NextAuth types
+        console.log('💾 Session callback - setting session.user.id:', userId, '(type:', typeof userId, ')');
       }
       console.log('💾 Session callback - session:', { 
         userId: session.user?.id, 

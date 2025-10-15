@@ -26,9 +26,7 @@ Låt oss börja: Vad är den **största utmaningen** just nu som gör att ni beh
 
 Nu **BÖRJAR Problem Discovery** 🔍
 
-Mitt mål nu är att förstå det VERKLIGA problemet bakom behovet (inte bara symptomen).
-
-Berätta: Vilket specifikt problem försöker ni lösa genom att anställa denna person?`
+Låt oss gräva djupare: **Vad är den största utmaningen just nu** som gör att ni behöver denna person?`
   },
   {
     id: 'solution-design',
@@ -38,9 +36,7 @@ Berätta: Vilket specifikt problem försöker ni lösa genom att anställa denna
 
 Nu **BÖRJAR Solution Design** 💡
 
-Jag ska nu hjälpa er designa 2-3 konkreta lösningsscenarier baserat på problemet vi identifierat.
-
-Låt mig tänka 20 sekunder och analysera möjliga vägar framåt...`
+**Hur har ni tänkt lösa detta?** Anställa en person, flera, eller kanske en konsult?`
   },
   {
     id: 'action-plan',
@@ -50,9 +46,7 @@ Låt mig tänka 20 sekunder och analysera möjliga vägar framåt...`
 
 Nu **BÖRJAR Action Plan** 📋
 
-För att skapa en konkret, körbar handlingsplan med tidslinjer och nästa steg...
-
-**Vem äger rekryteringsprocessen?** (VD, HR, eller någon annan?)`
+**När vill ni att personen ska vara på plats?** Hur snabbt kan ni röra er?`
   }
 ];
 
