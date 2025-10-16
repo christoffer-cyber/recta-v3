@@ -8,6 +8,8 @@ import { ResearchAnimation } from './canvas/ResearchAnimation';
 import { ScenarioComparison } from './canvas/ScenarioComparison';
 import { ProgressSteps } from './canvas/ProgressSteps';
 import { DeliverableProgressCard } from './DeliverableProgressCard';
+import { ContextOrgBuilder } from './canvas/ContextOrgBuilder';
+import { ProblemImpactMeter } from './canvas/ProblemImpactMeter';
 import type { CanvasState, JobDescriptionPreview, PhaseVisualization as PhaseViz } from '@/lib/canvas-types';
 import type { JobDescription, CompensationAnalysis, InterviewQuestions, SuccessPlan } from '@/lib/deliverable-schemas';
 import { PHASE_REQUIREMENTS } from '@/lib/confidence/config';
@@ -219,8 +221,17 @@ export function Canvas({ state, data, deliverables, researchState, showProgress,
                 />
               )}
 
-              {/* Confidence Breakdown */}
-              {requirements && (
+              {/* DYNAMIC CANVAS PER PHASE */}
+              {phaseId === 'Context' && (
+                <ContextOrgBuilder insights={data.phaseViz.insights} />
+              )}
+
+              {phaseId === 'Problem Discovery' && (
+                <ProblemImpactMeter insights={data.phaseViz.insights} />
+              )}
+
+              {/* Other phases keep ConfidenceBreakdown */}
+              {(phaseId === 'Solution Design' || phaseId === 'Action Plan') && requirements && (
                 <ConfidenceBreakdown
                   phase={phaseId}
                   confidence={data.phaseViz.confidence}
@@ -231,7 +242,7 @@ export function Canvas({ state, data, deliverables, researchState, showProgress,
                 />
               )}
 
-              {/* Scenario Comparison (Solution Design only) */}
+              {/* Scenarios for Solution Design - replaces other content when available */}
               {data.phaseViz.scenarios && data.phaseViz.scenarios.length > 0 && (
                 <ScenarioComparison scenarios={data.phaseViz.scenarios} />
               )}
